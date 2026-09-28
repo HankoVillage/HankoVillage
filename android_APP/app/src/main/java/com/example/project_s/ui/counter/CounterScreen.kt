@@ -8,6 +8,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+// ⬇️ 초기화 아이콘(Refresh) 임포트 추가
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -38,6 +40,9 @@ fun CounterScreen(
 
     // 수정 팝업 다이얼로그 제어 변수
     var showEditDialog by remember { mutableStateOf(false) }
+
+    // ⬇️ 초기화 경고 팝업 다이얼로그 제어 변수 추가
+    var showResetDialog by remember { mutableStateOf(false) }
 
     val progress = if (targetCount > 0) (currentCount.toFloat() / targetCount.toFloat()).coerceIn(0f, 1f) else 0f
     val remainingCount = (targetCount - currentCount).coerceAtLeast(0)
@@ -73,9 +78,43 @@ fun CounterScreen(
                 Text(text = title, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextDark)
                 Text(text = info, fontSize = 13.sp, color = Color.Gray)
             }
-            // ✏️ 정보 수정 버튼
-            IconButton(onClick = { showEditDialog = true }) {
-                Text("✏️", fontSize = 18.sp)
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // 🔄 1. 눈에 잘 띄는 블록형 단수 초기화 버튼
+                OutlinedButton(
+                    onClick = { showResetDialog = true },
+                    modifier = Modifier.height(38.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, PointOrange),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = PointOrange.copy(alpha = 0.08f) // 은은하게 채워진 배경색
+                    )
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "단수 초기화",
+                            tint = PointOrange,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "초기화",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = PointOrange
+                        )
+                    }
+                }
+
+                // ✏️ 2. 정보 수정 버튼
+                IconButton(onClick = { showEditDialog = true }) {
+                    Text("✏️", fontSize = 18.sp)
+                }
             }
         }
 
@@ -206,6 +245,37 @@ fun CounterScreen(
                 )
             }
         }
+    }
+
+    // ⬇️ 🎯 [팝업] 카운터 0단 초기화 경고 대화상자 추가
+    if (showResetDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetDialog = false },
+            title = {
+                Text("단수 초기화", fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Text("현재 진행한 단수를 0단으로 초기화하시겠습니까?\n이 작업은 되돌릴 수 없습니다.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        // ⬇️ 단수를 0으로 덮어쓰고 원본 데이터에도 반영
+                        currentCount = 0
+                        project.currentCount = 0
+                        showResetDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PointOrange)
+                ) {
+                    Text("초기화", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetDialog = false }) {
+                    Text("취소", color = Color.Gray)
+                }
+            }
+        )
     }
 
     // 🎯 [팝업] 사용자가 모든 정보를 재수정하는 대화상자
