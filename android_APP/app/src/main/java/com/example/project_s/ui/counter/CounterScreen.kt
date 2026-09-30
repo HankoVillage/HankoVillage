@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.WbSunny
@@ -30,15 +31,19 @@ val CardBg = Color(0xFFEFECE1)
 val PointOrange = Color(0xFFD36D33)
 val TextDark = Color(0xFF332D29)
 
+data class MemoItem(
+    val id: Long = System.currentTimeMillis(),
+    val count: Int,
+    var text: String
+)
+
 @Composable
 fun CounterScreen(
     project: ProjectData,
     onBackClick: () -> Unit
 ) {
-    // 💡 📱 [화면 켜짐 제어 상태 변수]
     var isKeepScreenOn by remember { mutableStateOf(true) }
 
-    // 💡 스위치 상태(isKeepScreenOn)에 따라 실시간으로 화면 켜짐 플래그 켜고 끄기
     val context = LocalContext.current
     DisposableEffect(isKeepScreenOn) {
         val window = (context as? Activity)?.window
@@ -53,26 +58,39 @@ fun CounterScreen(
         }
     }
 
-    // 📌 실시간으로 수정 가능한 상태값들
     var title by remember { mutableStateOf(project.title) }
     var info by remember { mutableStateOf(project.info) }
     var currentCount by remember { mutableStateOf(project.currentCount) }
     var targetCount by remember { mutableStateOf(project.targetCount) }
 
+    val memoList = remember { mutableStateListOf<MemoItem>() }
+
+    LaunchedEffect(Unit) {
+        if (project.memo.isNotBlank() && memoList.isEmpty()) {
+            memoList.add(MemoItem(count = currentCount, text = project.memo))
+        }
+    }
+
     // 메모 작성 다이얼로그 제어
     var showMemoDialog by remember { mutableStateOf(false) }
     var newMemoText by remember { mutableStateOf("") }
 
+    // 메모 수정 다이얼로그 제어
+    var editingMemo by remember { mutableStateOf<MemoItem?>(null) }
+    var editMemoText by remember { mutableStateOf("") }
+
+    // 🛠️ [메모 삭제 확인 다이얼로그 추가 1] 삭제할 대상 메모 상태 변수
+    var memoToDelete by remember { mutableStateOf<MemoItem?>(null) }
+
     // 수정 팝업 다이얼로그 제어 변수
     var showEditDialog by remember { mutableStateOf(false) }
 
-    // ⬇️ 초기화 경고 팝업 다이얼로그 제어 변수
+    // 초기화 경고 팝업 다이얼로그 제어 변수
     var showResetDialog by remember { mutableStateOf(false) }
 
     val progress = if (targetCount > 0) (currentCount.toFloat() / targetCount.toFloat()).coerceIn(0f, 1f) else 0f
     val remainingCount = (targetCount - currentCount).coerceAtLeast(0)
 
-    // 📜 화면 전체 스크롤 상태
     val scrollState = rememberScrollState()
 
     Column(
@@ -83,14 +101,14 @@ fun CounterScreen(
             .verticalScroll(scrollState)
             .imePadding()
     ) {
-        // 1. 뒤로가기 버튼 (상단 버튼 유지)
+        // 1. 뒤로가기 버튼
         TextButton(onClick = onBackClick) {
-            Text("< 도안 목록으로", color = PointOrange, fontWeight = FontWeight.Bold)
+            Text("< 카운터 목록으로", color = PointOrange, fontWeight = FontWeight.Bold)
         }
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // 2. 도안 정보 표시 및 [단수 초기화], [전체 정보 수정] 버튼 (상단 버튼 구성 유지)
+        // 2. 도안 정보 표시 및 [단수 초기화], [전체 정보 수정] 버튼
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -106,7 +124,6 @@ fun CounterScreen(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 🔄 블록형 단수 초기화 버튼
                 OutlinedButton(
                     onClick = { showResetDialog = true },
                     modifier = Modifier.height(38.dp),
@@ -134,7 +151,6 @@ fun CounterScreen(
                     }
                 }
 
-                // ✏️ 정보 수정 버튼
                 IconButton(onClick = { showEditDialog = true }) {
                     Text("✏️", fontSize = 18.sp)
                 }
@@ -218,13 +234,12 @@ fun CounterScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 🎨 5. 첨부 이미지와 동일한 [화면 꺼짐 방지 카드] + [메모 추가 버튼] 영역
+        // 5. [화면 꺼짐 방지 카드] + [메모 추가 버튼] 영역
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // ☀️ 화면 꺼짐 방지 카드
             Card(
                 modifier = Modifier
                     .weight(1f)
@@ -279,18 +294,16 @@ fun CounterScreen(
                 }
             }
 
-            // ✏️ 메모 추가 버튼 카드
             Card(
                 onClick = { showMemoDialog = true },
                 modifier = Modifier.height(72.dp),
                 shape = RoundedCornerShape(16.dp),
                 border = androidx.compose.foundation.BorderStroke(
-                    width = 1.dp, // 선 두께
-                    color = Color(0xFF625340) // 바깥쪽에 둘러씌울 테두리 색상
+                    width = 1.dp,
+                    color = Color(0xFF625340)
                 ),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFEFF7DF)) // 내부 배경색
-            )
-             {
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFEFF7DF))
+            ) {
                 Column(
                     modifier = Modifier
                         .padding(horizontal = 16.dp)
@@ -317,7 +330,7 @@ fun CounterScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 🎨 6. 메모 리스트 영역 (이미지 시안 적용)
+        // 6. 메모 리스트 영역
         Text(
             text = "메모",
             fontSize = 14.sp,
@@ -327,35 +340,79 @@ fun CounterScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // 메모 내용이 있을 경우 목록으로 표시
-        if (project.memo.isNotBlank()) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = CardBg)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "${currentCount}단",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = PointOrange
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = project.memo,
-                        fontSize = 13.sp,
-                        color = TextDark
-                    )
+        if (memoList.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                memoList.reversed().forEach { item ->
+                    Card(
+                        onClick = {
+                            editingMemo = item
+                            editMemoText = item.text
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = CardBg)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "${item.count}단",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = PointOrange
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = item.text,
+                                    fontSize = 13.sp,
+                                    color = TextDark
+                                )
+                            }
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(
+                                    onClick = {
+                                        editingMemo = item
+                                        editMemoText = item.text
+                                    },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = "메모 수정",
+                                        tint = Color.Gray,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+
+                                // 🛠️ [메모 삭제 확인 다이얼로그 추가 2] 바로 삭제하지 않고 삭제 안내 팝업 유도
+                                IconButton(
+                                    onClick = {
+                                        memoToDelete = item
+                                    },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "메모 삭제",
+                                        tint = Color(0xFFD32F2F),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         } else {
-            // 메모가 비어있을 때 안내 표시
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -388,7 +445,11 @@ fun CounterScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        project.memo = newMemoText
+                        if (newMemoText.isNotBlank()) {
+                            memoList.add(MemoItem(count = currentCount, text = newMemoText))
+                            project.memo = newMemoText
+                            newMemoText = ""
+                        }
                         showMemoDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = PointOrange)
@@ -397,7 +458,72 @@ fun CounterScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showMemoDialog = false }) {
+                TextButton(onClick = {
+                    newMemoText = ""
+                    showMemoDialog = false
+                }) {
+                    Text("취소", color = Color.Gray)
+                }
+            }
+        )
+    }
+
+    // 메모 수정 다이얼로그
+    if (editingMemo != null) {
+        AlertDialog(
+            onDismissRequest = { editingMemo = null },
+            title = { Text("메모 수정 (${editingMemo?.count}단)", fontWeight = FontWeight.Bold) },
+            text = {
+                OutlinedTextField(
+                    value = editMemoText,
+                    onValueChange = { editMemoText = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val targetIndex = memoList.indexOfFirst { it.id == editingMemo?.id }
+                        if (targetIndex != -1 && editMemoText.isNotBlank()) {
+                            memoList[targetIndex] = memoList[targetIndex].copy(text = editMemoText)
+                            project.memo = editMemoText
+                        }
+                        editingMemo = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PointOrange)
+                ) {
+                    Text("수정 완료", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingMemo = null }) {
+                    Text("취소", color = Color.Gray)
+                }
+            }
+        )
+    }
+
+    // 🛠️ [메모 삭제 확인 다이얼로그 추가 3] 메모 삭제 확인 안내 팝업창
+    if (memoToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { memoToDelete = null },
+            title = { Text("메모 삭제", fontWeight = FontWeight.Bold) },
+            text = { Text("[${memoToDelete?.count}단] \"${memoToDelete?.text}\"\n메모를 삭제하시겠습니까?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        memoList.remove(memoToDelete)
+                        project.memo = memoList.lastOrNull()?.text ?: ""
+                        memoToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
+                ) {
+                    Text("삭제", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { memoToDelete = null }) {
                     Text("취소", color = Color.Gray)
                 }
             }

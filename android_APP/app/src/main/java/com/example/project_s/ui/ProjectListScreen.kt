@@ -47,7 +47,7 @@ fun ProjectListScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text(text = "내 뜨개 도안 목록 🧶", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextDark)
+                Text(text = "내 카운터 목록 🧶", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextDark)
                 Text(text = "작업할 카드를 선택하세요", fontSize = 13.sp, color = Color.Gray)
             }
             Button(
@@ -55,7 +55,7 @@ fun ProjectListScreen(
                 colors = ButtonDefaults.buttonColors(containerColor = PointOrange),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Text("+ 새 도안", fontSize = 13.sp, color = Color.White)
+                Text("+ 새 카운터", fontSize = 13.sp, color = Color.White)
             }
         }
 
@@ -87,7 +87,7 @@ fun ProjectListScreen(
 
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
-            title = { Text("새 단수카운터 추가") },
+            title = { Text("새 단수ㅜ 카운터 추가") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
