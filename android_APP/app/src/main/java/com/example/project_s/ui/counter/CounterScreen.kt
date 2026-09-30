@@ -293,7 +293,7 @@ fun CounterScreen(
                     )
                 }
             }
-
+            // 메모 카드란
             Card(
                 onClick = { showMemoDialog = true },
                 modifier = Modifier.height(72.dp),
@@ -428,7 +428,7 @@ fun CounterScreen(
         }
     }
 
-    // 🎯 [팝업] 메모 작성 다이얼로그
+    //  [팝업] 메모 작성 다이얼로그
     if (showMemoDialog) {
         AlertDialog(
             onDismissRequest = { showMemoDialog = false },
@@ -504,7 +504,7 @@ fun CounterScreen(
         )
     }
 
-    // 🛠️ [메모 삭제 확인 다이얼로그 추가 3] 메모 삭제 확인 안내 팝업창
+    //  [메모 삭제 확인 다이얼로그 추가 3] 메모 삭제 확인 안내 팝업창
     if (memoToDelete != null) {
         AlertDialog(
             onDismissRequest = { memoToDelete = null },
@@ -554,7 +554,7 @@ fun CounterScreen(
         )
     }
 
-    // 🎯 [팝업] 도안 정보 수정 대화상자
+    // [팝업] 카운터 정보 수정 대화상자
     if (showEditDialog) {
         var editTitle by remember { mutableStateOf(title) }
         var editInfo by remember { mutableStateOf(info) }
@@ -563,7 +563,7 @@ fun CounterScreen(
 
         AlertDialog(
             onDismissRequest = { showEditDialog = false },
-            title = { Text("도안 정보 수정") },
+            title = { Text("카운터 정보 수정") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(

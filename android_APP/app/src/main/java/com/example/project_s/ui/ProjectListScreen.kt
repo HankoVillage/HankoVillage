@@ -87,7 +87,7 @@ fun ProjectListScreen(
 
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
-            title = { Text("새 단수ㅜ 카운터 추가") },
+            title = { Text("새 단수 카운터 추가") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
