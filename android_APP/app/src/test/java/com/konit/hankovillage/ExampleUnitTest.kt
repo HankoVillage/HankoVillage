@@ -1,4 +1,4 @@
-package com.example.hankovilage
+package com.konit.hankovillage
 
 import org.junit.Test
 
