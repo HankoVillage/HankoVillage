@@ -1,0 +1,13 @@
+# 비밀 정보 — 커밋 금지 (.env.example만 커밋)
+.env
+*.pem
+*_oci
+*_oci.pub
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# 로컬 백업 파일
+*.dump
