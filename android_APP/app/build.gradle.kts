@@ -4,13 +4,13 @@ plugins {
 }
 
 android {
-    namespace = "com.example.project_s"
+    namespace = "com.konit.hankovillage"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "com.example.project_s"
+        applicationId = "com.konit.hankovillage"
         minSdk = 24
         targetSdk = 37
         versionCode = 1

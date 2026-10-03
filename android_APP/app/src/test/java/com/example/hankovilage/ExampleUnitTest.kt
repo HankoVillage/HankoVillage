@@ -1,4 +1,4 @@
-package com.example.project_s
+package com.example.hankovilage
 
 import org.junit.Test
 

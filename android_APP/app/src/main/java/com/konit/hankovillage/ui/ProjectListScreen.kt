@@ -1,11 +1,10 @@
-package com.example.project_s.ui
+package com.konit.hankovillage.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -19,17 +18,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.project_s.ProjectData
-import com.example.project_s.ui.counter.BgColor
-import com.example.project_s.ui.counter.CardBg
-import com.example.project_s.ui.counter.PointOrange
-import com.example.project_s.ui.counter.TextDark
+import androidx.compose.foundation.lazy.grid.items
+import com.konit.hankovillage.ProjectData
+import com.konit.hankovillage.ui.counter.BgColor
+import com.konit.hankovillage.ui.counter.CardBg
+import com.konit.hankovillage.ui.counter.PointOrange
+import com.konit.hankovillage.ui.counter.TextDark
 
 @Composable
 fun ProjectListScreen(
     projectList: List<ProjectData>,
     onAddProject: (ProjectData) -> Unit,
-    onDeleteProject: (ProjectData) -> Unit, // 🗑️ 삭제 동작 콜백 추가
+    onDeleteProject: (ProjectData) -> Unit, // 🗑️ 삭제 동작 콜백
     onProjectSelect: (ProjectData) -> Unit
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
@@ -40,7 +40,7 @@ fun ProjectListScreen(
             .background(BgColor)
             .padding(20.dp)
     ) {
-        // 1. 헤더 (타이틀 + 새 도안 추가 버튼)
+        // 1. 헤더 (타이틀 + 새 카운터 추가 버튼)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -61,7 +61,7 @@ fun ProjectListScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 2. 카드 2열 배치
+        // 2. 카드 2열 그리드 배치
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -77,11 +77,11 @@ fun ProjectListScreen(
         }
     }
 
-    // 🎯 [팝업] 새 도안 추가 대화상자
+    // 🎯 [팝업] 새 도안/카운터 추가 대화상자
     if (showAddDialog) {
         var title by remember { mutableStateOf("") }
         var info by remember { mutableStateOf("") }
-        var needleType by androidx.compose.runtime.remember {mutableStateOf("")}
+        var needleType by remember { mutableStateOf("") }
         var current by remember { mutableStateOf("0") }
         var target by remember { mutableStateOf("100") }
 
@@ -116,7 +116,8 @@ fun ProjectListScreen(
                         singleLine = true
                     )
                     OutlinedTextField(
-                        value = target, onValueChange = { target = it },
+                        value = target,
+                        onValueChange = { target = it },
                         label = { Text("목표 단수") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true
@@ -147,7 +148,7 @@ fun ProjectListScreen(
     }
 }
 
-// 📌 개별 카드 아이템 (삭제 버튼 및 팝업 포함)
+// 📌 개별 카운터 카드 아이템 (삭제 버튼 및 팝업 포함)
 @Composable
 fun ProjectCardItem(
     project: ProjectData,
@@ -205,7 +206,12 @@ fun ProjectCardItem(
                 Text(text = project.title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextDark)
                 Text(text = project.info, fontSize = 11.sp, color = Color.Gray)
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(text = "${project.currentCount} / ${project.targetCount}단", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = PointOrange)
+                Text(
+                    text = "${project.currentCount} / ${project.targetCount}단",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = PointOrange
+                )
             }
         }
     }

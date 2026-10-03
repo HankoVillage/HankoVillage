@@ -1,4 +1,4 @@
-package com.example.project_s.ui.theme
+package com.konit.hankovillage.ui.theme
 
 // 컬러 지정하는 테마
 

@@ -1,4 +1,4 @@
-package com.example.project_s.ui.counter
+package com.konit.hankovillage.ui.counter
 
 import android.app.Activity
 import android.view.WindowManager
@@ -24,7 +24,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.project_s.ProjectData
+import com.konit.hankovillage.ProjectData
+import androidx.compose.runtime.saveable.rememberSaveable
 
 val BgColor = Color(0xFFF7F4EB)
 val CardBg = Color(0xFFEFECE1)
@@ -43,8 +44,8 @@ fun CounterScreen(
     onBackClick: () -> Unit
 ) {
     var isKeepScreenOn by remember { mutableStateOf(true) }
-
     val context = LocalContext.current
+
     DisposableEffect(isKeepScreenOn) {
         val window = (context as? Activity)?.window
         if (isKeepScreenOn) {
@@ -71,21 +72,15 @@ fun CounterScreen(
         }
     }
 
-    // 메모 작성 다이얼로그 제어
     var showMemoDialog by remember { mutableStateOf(false) }
     var newMemoText by remember { mutableStateOf("") }
 
-    // 메모 수정 다이얼로그 제어
     var editingMemo by remember { mutableStateOf<MemoItem?>(null) }
     var editMemoText by remember { mutableStateOf("") }
 
-    // 🛠️ [메모 삭제 확인 다이얼로그 추가 1] 삭제할 대상 메모 상태 변수
     var memoToDelete by remember { mutableStateOf<MemoItem?>(null) }
 
-    // 수정 팝업 다이얼로그 제어 변수
     var showEditDialog by remember { mutableStateOf(false) }
-
-    // 초기화 경고 팝업 다이얼로그 제어 변수
     var showResetDialog by remember { mutableStateOf(false) }
 
     val progress = if (targetCount > 0) (currentCount.toFloat() / targetCount.toFloat()).coerceIn(0f, 1f) else 0f
@@ -101,14 +96,12 @@ fun CounterScreen(
             .verticalScroll(scrollState)
             .imePadding()
     ) {
-        // 1. 뒤로가기 버튼
         TextButton(onClick = onBackClick) {
             Text("< 카운터 목록으로", color = PointOrange, fontWeight = FontWeight.Bold)
         }
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // 2. 도안 정보 표시 및 [단수 초기화], [전체 정보 수정] 버튼
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -159,7 +152,6 @@ fun CounterScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 3. 메인 카운터 카드
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp),
@@ -200,7 +192,6 @@ fun CounterScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 4. 단수 조작 버튼
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -234,7 +225,6 @@ fun CounterScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 5. [화면 꺼짐 방지 카드] + [메모 추가 버튼] 영역
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -293,7 +283,7 @@ fun CounterScreen(
                     )
                 }
             }
-            // 메모 카드란
+
             Card(
                 onClick = { showMemoDialog = true },
                 modifier = Modifier.height(72.dp),
@@ -330,7 +320,6 @@ fun CounterScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 6. 메모 리스트 영역
         Text(
             text = "메모",
             fontSize = 14.sp,
@@ -393,7 +382,6 @@ fun CounterScreen(
                                     )
                                 }
 
-                                // 🛠️ [메모 삭제 확인 다이얼로그 추가 2] 바로 삭제하지 않고 삭제 안내 팝업 유도
                                 IconButton(
                                     onClick = {
                                         memoToDelete = item
@@ -428,7 +416,6 @@ fun CounterScreen(
         }
     }
 
-    //  [팝업] 메모 작성 다이얼로그
     if (showMemoDialog) {
         AlertDialog(
             onDismissRequest = { showMemoDialog = false },
@@ -468,7 +455,6 @@ fun CounterScreen(
         )
     }
 
-    // 메모 수정 다이얼로그
     if (editingMemo != null) {
         AlertDialog(
             onDismissRequest = { editingMemo = null },
@@ -504,7 +490,6 @@ fun CounterScreen(
         )
     }
 
-    //  [메모 삭제 확인 다이얼로그 추가 3] 메모 삭제 확인 안내 팝업창
     if (memoToDelete != null) {
         AlertDialog(
             onDismissRequest = { memoToDelete = null },
@@ -530,7 +515,6 @@ fun CounterScreen(
         )
     }
 
-    // 🎯 [팝업] 카운터 0단 초기화 경고 대화상자
     if (showResetDialog) {
         AlertDialog(
             onDismissRequest = { showResetDialog = false },
@@ -554,7 +538,6 @@ fun CounterScreen(
         )
     }
 
-    // [팝업] 카운터 정보 수정 대화상자
     if (showEditDialog) {
         var editTitle by remember { mutableStateOf(title) }
         var editInfo by remember { mutableStateOf(info) }

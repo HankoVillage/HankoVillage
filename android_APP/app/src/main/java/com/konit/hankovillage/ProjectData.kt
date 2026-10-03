@@ -1,4 +1,4 @@
-package com.example.project_s
+package com.konit.hankovillage
 
 // 📌 메모(memo) 속성 추가
 data class ProjectData(
