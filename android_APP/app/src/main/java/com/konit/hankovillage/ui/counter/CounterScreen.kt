@@ -36,7 +36,7 @@ val TextDark = Color(0xFF332D29)
  * 카운터 단수별 메모 항목 데이터 모델
  *
  * @property id 메모 고유 식별자 (기본값: 생성 타임스탬프)
- * @property count 메모가 작성된 시점의 단수
+ * @property count 메모가 작성된 시점 단수
  * @property text 메모 내용
  */
 data class MemoItem(
