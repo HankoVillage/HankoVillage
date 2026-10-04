@@ -32,12 +32,25 @@ val CardBg = Color(0xFFEFECE1)
 val PointOrange = Color(0xFFD36D33)
 val TextDark = Color(0xFF332D29)
 
+/**
+ * 카운터 단수별 메모 항목 데이터 모델
+ *
+ * @property id 메모 고유 식별자 (기본값: 생성 타임스탬프)
+ * @property count 메모가 작성된 시점의 단수
+ * @property text 메모 내용
+ */
 data class MemoItem(
     val id: Long = System.currentTimeMillis(),
     val count: Int,
     var text: String
 )
 
+/**
+ * 뜨개질 프로젝트의 진행 단수 카운팅 및 메모 관리 화면 컴포저블
+ *
+ * @property project 현재 진행 중인 프로젝트 데이터 객체
+ * @property onBackClick 카운터 목록 화면으로 이동하는 콜백
+ */
 @Composable
 fun CounterScreen(
     project: ProjectData,
@@ -46,6 +59,7 @@ fun CounterScreen(
     var isKeepScreenOn by remember { mutableStateOf(true) }
     val context = LocalContext.current
 
+    // 뜨개질 진행 중 화면이 꺼지지 않도록 윈도우 플래그 제어
     DisposableEffect(isKeepScreenOn) {
         val window = (context as? Activity)?.window
         if (isKeepScreenOn) {
@@ -145,7 +159,12 @@ fun CounterScreen(
                 }
 
                 IconButton(onClick = { showEditDialog = true }) {
-                    Text("✏️", fontSize = 18.sp)
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "카운터 정보 수정",
+                        tint = TextDark,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
         }

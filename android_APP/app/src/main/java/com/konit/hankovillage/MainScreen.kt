@@ -3,7 +3,6 @@ package com.konit.hankovillage
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-// 💡 실 보관소 아이콘용 ShoppingBag 임포트
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Person
@@ -17,12 +16,15 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-
-// 🛠️ [패키지 싱크 수정] 변경된 패키지 경로로 임포트 수정
 import com.konit.hankovillage.ui.ProjectListScreen
 import com.konit.hankovillage.ui.counter.CounterScreen
 
-// 🛠️ 1. 하단 탭 설정표 (BottomNavItem)
+/**
+ * 앱의 하단 네비게이션 탭 아이템 정의
+ *
+ * @property title 탭에 표시될 타이틀
+ * @property route 네비게이션 경로
+ */
 sealed class BottomNavItem(val title: String, val route: String) {
     object Home : BottomNavItem("단수카운터", "home")
     object Pattern : BottomNavItem("도안 보관", "pattern")
@@ -31,11 +33,13 @@ sealed class BottomNavItem(val title: String, val route: String) {
     object Yarn : BottomNavItem("실 보관소", "yarn")
 }
 
+/**
+ * 앱의 메인 화면 구조 및 네비게이션 바를 구성하는 컴포저블
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen() {
     val navController = rememberNavController()
-    // 🛠️ 2. 시작 탭을 Home(단수카운터)으로 설정
     var selectedTab by remember { mutableStateOf<BottomNavItem>(BottomNavItem.Home) }
 
     val projectList = remember {
@@ -43,14 +47,13 @@ fun MainScreen() {
             ProjectData(
                 1, "가을 머플러", "대바늘",
                 "메리노 울 · 4.0mm", 47, 120, "진행",
-                "20단마다 무늬 바꾸기 🧶"
+                "20단마다 무늬 바꾸기"
             )
         )
     }
 
     var selectedProject by remember { mutableStateOf<ProjectData?>(null) }
 
-    // 🎨 앱 디자인 테마 색상 정의 (포인트 오렌지 및 아이보리 배경)
     val appBgColor = Color(0xFFF7F4EB)
     val pointOrangeColor = Color(0xFFD36D33)
 
@@ -61,13 +64,12 @@ fun MainScreen() {
                 modifier = Modifier.height(90.dp),
                 containerColor = appBgColor
             ) {
-                // 🛠️ 3. 하단 탭바 순서 재설정 (5개 탭)
                 val items = listOf(
-                    BottomNavItem.Yarn,       // 실 보관소
-                    BottomNavItem.Pattern,    // 도안 보관
-                    BottomNavItem.Home,       // 단수카운터
-                    BottomNavItem.Community,  // 커뮤니티
-                    BottomNavItem.Profile,    // 프로필
+                    BottomNavItem.Yarn,
+                    BottomNavItem.Pattern,
+                    BottomNavItem.Home,
+                    BottomNavItem.Community,
+                    BottomNavItem.Profile,
                 )
 
                 items.forEach { item ->
@@ -108,7 +110,6 @@ fun MainScreen() {
             startDestination = BottomNavItem.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            // 🛠️ 6. Home(단수카운터) 라우팅
             composable(BottomNavItem.Home.route) {
                 if (selectedProject == null) {
                     ProjectListScreen(
@@ -125,7 +126,6 @@ fun MainScreen() {
                 }
             }
 
-            // 🛠️ 7. 기타 서브 탭 화면
             composable(BottomNavItem.Pattern.route) {
                 Text("도안 보관 화면 (준비 중)", modifier = Modifier.padding(16.dp))
             }
