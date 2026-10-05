@@ -18,9 +18,12 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.konit.hankovillage.ui.ProjectListScreen
+import com.konit.hankovillage.ui.counter.ProjectListScreen
 import com.konit.hankovillage.ui.counter.CounterScreen
+import com.konit.hankovillage.ui.counter.ProjectData
 import com.konit.hankovillage.ui.pattern.PatternScreen
+import com.konit.hankovillage.ui.yarn.YarnScreen
+
 
 /**
  * 앱의 하단 네비게이션 탭 아이템 정의
@@ -137,17 +140,19 @@ fun MainScreen() {
                 PatternScreen()
             }
 
+            composable(BottomNavItem.Yarn.route) {
+                YarnScreen()
+            }
+
             composable(BottomNavItem.Community.route) {
-                Text("커뮤니티 화면 (준비 중)", modifier = Modifier.padding(16.dp))
+                Text("프로필 화면 (준비 중)", modifier = Modifier.padding(16.dp))
             }
 
             composable(BottomNavItem.Profile.route) {
                 Text("프로필 화면 (준비 중)", modifier = Modifier.padding(16.dp))
             }
 
-            composable(BottomNavItem.Yarn.route) {
-                Text("실 보관소 화면 (준비 중)", modifier = Modifier.padding(16.dp))
-            }
+
         }
     }
 }

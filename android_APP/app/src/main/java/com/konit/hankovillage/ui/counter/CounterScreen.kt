@@ -24,9 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.konit.hankovillage.ProjectData
 import androidx.activity.compose.BackHandler
-import androidx.compose.runtime.saveable.rememberSaveable
 
 val BgColor = Color(0xFFF7F4EB)
 val CardBg = Color(0xFFEFECE1)

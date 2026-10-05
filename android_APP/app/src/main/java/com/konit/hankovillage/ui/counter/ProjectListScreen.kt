@@ -1,4 +1,4 @@
-package com.konit.hankovillage.ui
+package com.konit.hankovillage.ui.counter
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,11 +19,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.lazy.grid.items
-import com.konit.hankovillage.ProjectData
-import com.konit.hankovillage.ui.counter.BgColor
-import com.konit.hankovillage.ui.counter.CardBg
-import com.konit.hankovillage.ui.counter.PointOrange
-import com.konit.hankovillage.ui.counter.TextDark
 
 /**
  * 등록된 프로젝트 카운터 목록을 조회하고, 신규 카운터를 추가하거나 선택/삭제하는 화면 컴포저블

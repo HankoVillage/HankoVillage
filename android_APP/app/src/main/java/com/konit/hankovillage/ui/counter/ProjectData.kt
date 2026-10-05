@@ -1,4 +1,4 @@
-package com.konit.hankovillage
+package com.konit.hankovillage.ui.counter
 
 // 메모(memo) 속성 추가
 data class ProjectData(
