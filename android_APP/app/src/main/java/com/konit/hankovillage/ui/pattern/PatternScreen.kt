@@ -31,9 +31,11 @@ val CardBg = Color(0xFFEFECE1)
 val PointOrange = Color(0xFFD36D33)
 val TextDark = Color(0xFF332D29)
 
-// 태그 선택지 리스트
 val AvailableTags = listOf("의류", "목도리", "모자", "가방", "인형", "기타")
 
+/**
+ * 도안 보관소의 전체 목록 검색, 필터링, 상세 보기 및 등록 프로세스를 관리하는 메인 화면 컴포저블
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PatternScreen() {
@@ -82,7 +84,6 @@ fun PatternScreen() {
     }
 
     if (selectedPattern != null) {
-        // 🔍 도안 상세 화면
         PatternDetailContent(
             pattern = selectedPattern!!,
             onBackClick = { selectedPattern = null },
@@ -97,7 +98,6 @@ fun PatternScreen() {
             }
         )
     } else {
-        // 📋 도안 목록 화면
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -110,7 +110,7 @@ fun PatternScreen() {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "도안 보관소 📂",
+                    text = "도안 보관소",
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextDark
@@ -214,7 +214,12 @@ fun PatternScreen() {
     }
 }
 
-// 🎴 도안 카드 아이템
+/**
+ * 그리드 목록 내 개별 도안 정보를 카드 형태로 보여주는 컴포저블
+ *
+ * @param pattern 표시할 도안 데이터
+ * @param onClick 카드 선택 시 수행할 행동
+ */
 @Composable
 fun PatternCardItem(
     pattern: PatternData,
@@ -265,16 +270,23 @@ fun PatternCardItem(
             Spacer(modifier = Modifier.height(6.dp))
 
             if (pattern.yarnInfo.isNotBlank()) {
-                Text(text = "🧶 ${pattern.yarnInfo}", fontSize = 11.sp, color = Color.Gray, maxLines = 1)
+                Text(text = "사용 실: ${pattern.yarnInfo}", fontSize = 11.sp, color = Color.Gray, maxLines = 1)
             }
             if (pattern.needleInfo.isNotBlank()) {
-                Text(text = "🪡 ${pattern.needleInfo}", fontSize = 11.sp, color = Color.Gray, maxLines = 1)
+                Text(text = "바늘 정보: ${pattern.needleInfo}", fontSize = 11.sp, color = Color.Gray, maxLines = 1)
             }
         }
     }
 }
 
-// 📄 도안 상세 화면
+/**
+ * 선택된 도안의 세부 정보를 표시하고 수정/삭제 및 외부 링크 이동을 제공하는 상세 화면
+ *
+ * @param pattern 상세 정보를 출력할 도안 객체
+ * @param onBackClick 뒤로가기 버튼 클릭 콜백
+ * @param onUpdate 도안 정보 업데이트 발생 시 콜백
+ * @param onDelete 도안 삭제 요청 시 콜백
+ */
 @Composable
 fun PatternDetailContent(
     pattern: PatternData,
@@ -328,7 +340,6 @@ fun PatternDetailContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 🏷️ 진행 상태 즉시 변경 버튼 그룹 (예정 / 진행 / 완성)
         Text(text = "진행 상태", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
         Spacer(modifier = Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -350,7 +361,6 @@ fun PatternDetailContent(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 🧶 실 & 🪡 바늘 상세 카드
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -358,11 +368,11 @@ fun PatternDetailContent(
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("🧶 사용 실: ", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextDark)
+                    Text("사용 실: ", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextDark)
                     Text(if (pattern.yarnInfo.isNotBlank()) pattern.yarnInfo else "미입력", fontSize = 14.sp, color = TextDark)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("🪡 바늘 정보: ", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextDark)
+                    Text("바늘 정보: ", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextDark)
                     Text(if (pattern.needleInfo.isNotBlank()) pattern.needleInfo else "미입력", fontSize = 14.sp, color = TextDark)
                 }
             }
@@ -370,7 +380,6 @@ fun PatternDetailContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 🔗 외부 도안 링크 버튼
         if (pattern.patternUrl.isNotBlank()) {
             Button(
                 onClick = {
@@ -383,7 +392,7 @@ fun PatternDetailContent(
             ) {
                 Icon(imageVector = Icons.Default.Link, contentDescription = null, tint = Color.White)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("🔗 도안 링크 열기", color = Color.White, fontWeight = FontWeight.Bold)
+                Text("도안 링크 열기", color = Color.White, fontWeight = FontWeight.Bold)
             }
         } else {
             OutlinedButton(
@@ -391,7 +400,7 @@ fun PatternDetailContent(
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Text("➕ 도안 링크 등록하기", color = Color.Gray)
+                Text("도안 링크 등록하기", color = Color.Gray)
             }
         }
 
@@ -407,7 +416,6 @@ fun PatternDetailContent(
         }
     }
 
-    // ✏️ 정보 수정 다이얼로그
     if (showEditDialog) {
         PatternEditDialog(
             pattern = pattern,
@@ -433,13 +441,18 @@ fun PatternDetailContent(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) { Text("취소") }
+                TextButton(onClick = { showDeleteDialog = false }) { Text("취소", color = Color.Gray) }
             }
         )
     }
 }
 
-// 📤 도안 등록 다이얼로그
+/**
+ * 신규 도안 등록을 위한 모달 다이얼로그
+ *
+ * @param onDismiss 다이얼로그 닫기 콜백
+ * @param onConfirm 도안 생성 확정 시 콜백
+ */
 @Composable
 fun PatternUploadDialog(
     onDismiss: () -> Unit,
@@ -464,7 +477,6 @@ fun PatternUploadDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // 태그 프리셋 선택 (의류, 목도리, 모자, 가방, 인형, 기타)
                 Text("태그 선택", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
                 Row(
                     modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -531,7 +543,13 @@ fun PatternUploadDialog(
     )
 }
 
-// ✏️ 도안 정보 수정 다이얼로그
+/**
+ * 기존 도안 정보의 수정을 처리하는 모달 다이얼로그
+ *
+ * @param pattern 수정할 대상 도안 객체
+ * @param onDismiss 다이얼로그 닫기 콜백
+ * @param onConfirm 수정 사항 적용 확정 콜백
+ */
 @Composable
 fun PatternEditDialog(
     pattern: PatternData,
