@@ -25,11 +25,19 @@ import com.konit.hankovillage.ui.counter.CardBg
 import com.konit.hankovillage.ui.counter.PointOrange
 import com.konit.hankovillage.ui.counter.TextDark
 
+/**
+ * 등록된 프로젝트 카운터 목록을 조회하고, 신규 카운터를 추가하거나 선택/삭제하는 화면 컴포저블
+ *
+ * @param projectList 등록된 프로젝트 목록
+ * @param onAddProject 프로젝트 추가 콜백
+ * @param onDeleteProject 프로젝트 삭제 콜백
+ * @param onProjectSelect 프로젝트 선택 콜백
+ */
 @Composable
 fun ProjectListScreen(
     projectList: List<ProjectData>,
     onAddProject: (ProjectData) -> Unit,
-    onDeleteProject: (ProjectData) -> Unit, // 🗑️ 삭제 동작 콜백
+    onDeleteProject: (ProjectData) -> Unit,
     onProjectSelect: (ProjectData) -> Unit
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
@@ -40,14 +48,13 @@ fun ProjectListScreen(
             .background(BgColor)
             .padding(20.dp)
     ) {
-        // 1. 헤더 (타이틀 + 새 카운터 추가 버튼)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text(text = "내 카운터 목록 🧶", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextDark)
+                Text(text = "내 카운터 목록", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextDark)
                 Text(text = "작업할 카드를 선택하세요", fontSize = 13.sp, color = Color.Gray)
             }
             Button(
@@ -61,7 +68,6 @@ fun ProjectListScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 2. 카드 2열 그리드 배치
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -71,13 +77,12 @@ fun ProjectListScreen(
                 ProjectCardItem(
                     project = project,
                     onClick = { onProjectSelect(project) },
-                    onDelete = { onDeleteProject(project) } // 🗑️ 삭제 함수 전달
+                    onDelete = { onDeleteProject(project) }
                 )
             }
         }
     }
 
-    // 🎯 [팝업] 새 도안/카운터 추가 대화상자
     if (showAddDialog) {
         var title by remember { mutableStateOf("") }
         var info by remember { mutableStateOf("") }
@@ -148,7 +153,13 @@ fun ProjectListScreen(
     }
 }
 
-// 📌 개별 카운터 카드 아이템 (삭제 버튼 및 팝업 포함)
+/**
+ * 개별 카운터 카드 항목 컴포저블
+ *
+ * @param project 카드에 표시할 프로젝트 데이터
+ * @param onClick 카드 영역 선택 콜백
+ * @param onDelete 카드 삭제 클릭 콜백
+ */
 @Composable
 fun ProjectCardItem(
     project: ProjectData,
@@ -169,7 +180,6 @@ fun ProjectCardItem(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // 상단: 상태 태그 + 쓰레기통 삭제 아이콘
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -188,7 +198,6 @@ fun ProjectCardItem(
                     )
                 }
 
-                // 🗑️ 삭제 아이콘 버튼
                 IconButton(
                     onClick = { showDeleteConfirm = true },
                     modifier = Modifier.size(24.dp)
@@ -201,7 +210,6 @@ fun ProjectCardItem(
                 }
             }
 
-            // 하단: 타이틀, 정보, 단수
             Column {
                 Text(text = project.title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextDark)
                 Text(text = project.info, fontSize = 11.sp, color = Color.Gray)
@@ -216,7 +224,6 @@ fun ProjectCardItem(
         }
     }
 
-    // 🗑️ [삭제 확인 팝업]
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },

@@ -25,6 +25,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.konit.hankovillage.ProjectData
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.saveable.rememberSaveable
 
 val BgColor = Color(0xFFF7F4EB)
@@ -56,6 +57,10 @@ fun CounterScreen(
     project: ProjectData,
     onBackClick: () -> Unit
 ) {
+    BackHandler {
+        onBackClick()
+    }
+
     var isKeepScreenOn by remember { mutableStateOf(true) }
     val context = LocalContext.current
 

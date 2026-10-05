@@ -2,6 +2,7 @@ package com.konit.hankovillage.ui.pattern
 
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -49,15 +50,6 @@ fun PatternScreen() {
                 needleInfo = "4.0mm 대바늘",
                 patternUrl = "https://example.com/pattern/1",
                 status = PatternStatus.IN_PROGRESS
-            ),
-            PatternData(
-                id = 2L,
-                title = "탑다운 여름 니트",
-                tag = "의류",
-                yarnInfo = "코튼 실 200g",
-                needleInfo = "3.5mm 줄바늘",
-                patternUrl = "",
-                status = PatternStatus.PLANNED
             )
         )
     }
@@ -84,6 +76,11 @@ fun PatternScreen() {
     }
 
     if (selectedPattern != null) {
+        // 상세 화면에서 시스템 뒤로가기 동작 시 목록 화면으로 복귀
+        BackHandler {
+            selectedPattern = null
+        }
+
         PatternDetailContent(
             pattern = selectedPattern!!,
             onBackClick = { selectedPattern = null },
@@ -301,7 +298,6 @@ fun PatternDetailContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgColor)
             .padding(20.dp)
     ) {
         Row(

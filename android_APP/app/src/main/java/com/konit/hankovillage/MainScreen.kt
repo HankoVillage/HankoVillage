@@ -1,15 +1,17 @@
 package com.konit.hankovillage
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -53,7 +55,7 @@ fun MainScreen() {
         )
     }
 
-    var selectedProject by remember { mutableStateOf<ProjectData?>(null) }
+    var selectedProject by rememberSaveable { mutableStateOf<ProjectData?>(null) }
 
     val appBgColor = Color(0xFFF7F4EB)
     val pointOrangeColor = Color(0xFFD36D33)
@@ -120,6 +122,10 @@ fun MainScreen() {
                         onProjectSelect = { project -> selectedProject = project }
                     )
                 } else {
+                    BackHandler {
+                        selectedProject = null
+                    }
+
                     CounterScreen(
                         project = selectedProject!!,
                         onBackClick = { selectedProject = null }
