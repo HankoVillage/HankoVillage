@@ -1,0 +1,472 @@
+Index: app/src/main/java/com/example/project_s/ProjectData.kt
+===================================================================
+diff --git a/app/src/main/java/com/example/project_s/ProjectData.kt b/app/src/main/java/com/example/project_s/ProjectData.kt
+deleted file mode 100644
+--- a/app/src/main/java/com/example/project_s/ProjectData.kt	(revision d4499ea561e520fefee2855c4c2fefe9038a1f78)
++++ /dev/null	(revision d4499ea561e520fefee2855c4c2fefe9038a1f78)
+@@ -1,13 +0,0 @@
+-package com.example.project_s
+-
+-// 📌 메모(memo) 속성 추가
+-data class ProjectData(
+-    val id: Long = System.currentTimeMillis(), // 고유 ID
+-    var title: String,         // 작품 이름
+-    var needleType: String,    // 바늘 종류 (예: 대바늘 / 코바늘)
+-    var info: String,          // 실 및 바늘 정보
+-    var currentCount: Int,     // 현재 진행 단수
+-    var targetCount: Int,      // 목표 단수
+-    var status: String = "진행", // 진행 상태
+-    var memo: String = ""      // 📝 뜨개 메모 필드 추가!
+-)
+\ No newline at end of file
+Index: app/src/main/java/com/example/project_s/ui/pattern/PatternScreen.kt
+===================================================================
+diff --git a/app/src/main/java/com/example/project_s/ui/pattern/PatternScreen.kt b/app/src/main/java/com/example/project_s/ui/pattern/PatternScreen.kt
+new file mode 100644
+--- /dev/null	(date 1791198038773)
++++ b/app/src/main/java/com/example/project_s/ui/pattern/PatternScreen.kt	(date 1791198038773)
+@@ -0,0 +1,4 @@
++package com.example.project_s.ui.pattern
++
++class PatternScreen  {
++}
+\ No newline at end of file
+Index: app/src/main/java/com/example/project_s/ui/pattern/ProjectData.kt
+===================================================================
+diff --git a/app/src/main/java/com/example/project_s/ui/pattern/ProjectData.kt b/app/src/main/java/com/example/project_s/ui/pattern/ProjectData.kt
+new file mode 100644
+--- /dev/null	(date 1791198038693)
++++ b/app/src/main/java/com/example/project_s/ui/pattern/ProjectData.kt	(date 1791198038693)
+@@ -0,0 +1,13 @@
++package com.example.project_s.ui.pattern
++
++// 📌 메모(memo) 속성 추가
++data class ProjectData(
++    val id: Long = System.currentTimeMillis(), // 고유 ID
++    var title: String,         // 작품 이름
++    var needleType: String,    // 바늘 종류 (예: 대바늘 / 코바늘)
++    var info: String,          // 실 및 바늘 정보
++    var currentCount: Int,     // 현재 진행 단수
++    var targetCount: Int,      // 목표 단수
++    var status: String = "진행", // 진행 상태
++    var memo: String = ""      // 📝 뜨개 메모 필드 추가!
++)
+\ No newline at end of file
+Index: app/src/main/java/com/example/project_s/ui/PatternData.kt
+===================================================================
+diff --git a/app/src/main/java/com/example/project_s/ui/PatternData.kt b/app/src/main/java/com/example/project_s/ui/PatternData.kt
+new file mode 100644
+--- /dev/null	(date 1791197912966)
++++ b/app/src/main/java/com/example/project_s/ui/PatternData.kt	(date 1791197912966)
+@@ -0,0 +1,410 @@
++package com.konit.hankovillage.ui.pattern
++
++import androidx.compose.foundation.background
++import androidx.compose.foundation.layout.*
++import androidx.compose.foundation.lazy.grid.GridCells
++import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
++import androidx.compose.foundation.shape.RoundedCornerShape
++import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.filled.Add
++import androidx.compose.material.icons.filled.Search
++import androidx.compose.material3.*
++import androidx.compose.runtime.*
++import androidx.compose.runtime.saveable.rememberSaveable
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
++
++val BgColor = Color(0xFFF7F4EB)
++val CardBg = Color(0xFFEFECE1)
++val PointOrange = Color(0xFFD36D33)
++val TextDark = Color(0xFF332D29)
++
++@OptIn(ExperimentalMaterial3Api::class)
++@Composable
++fun PatternScreen() {
++    // 임시 도안 더미 데이터 리스트
++    val patternList = remember {
++        mutableStateListOf(
++            PatternData(
++                id = 1L,
++                title = "가을 체크 머플러",
++                info = "메리노울 4.0mm 사용",
++                tag = "목도리",
++                status = PatternStatus.IN_PROGRESS
++            ),
++            PatternData(
++                id = 2L,
++                title = "탑다운 탑 스웨터",
++                info = "여름용 코튼 실 3.5mm",
++                tag = "의류",
++                status = PatternStatus.PLANNED
++            )
++        )
++    }
++
++    // 검색 및 필터링 상태
++    var searchQuery by rememberSaveable { mutableStateOf("") }
++    var selectedStatusFilter by rememberSaveable { mutableStateOf<PatternStatus?>(null) }
++    var selectedSortOrder by rememberSaveable { mutableStateOf(PatternSortOrder.NEWEST) }
++
++    // 선택된 상세 화면 데이터
++    var selectedPattern by rememberSaveable { mutableStateOf<PatternData?>(null) }
++    var showUploadDialog by rememberSaveable { mutableStateOf(false) }
++
++    // 2글자 이상 입력 시에만 검색 필터 적용
++    val filteredPatterns = patternList.filter { pattern ->
++        val matchesQuery = if (searchQuery.trim().length >= 2) {
++            pattern.title.contains(searchQuery, ignoreCase = true) ||
++                    pattern.tag.contains(searchQuery, ignoreCase = true)
++        } else true
++
++        val matchesStatus = selectedStatusFilter?.let { pattern.status == it } ?: true
++
++        matchesQuery && matchesStatus
++    }.sortedWith { p1, p2 ->
++        if (selectedSortOrder == PatternSortOrder.NEWEST) p2.id.compareTo(p1.id)
++        else p1.title.compareTo(p2.title)
++    }
++
++    if (selectedPattern != null) {
++        // 🔍 도안 상세 화면
++        PatternDetailContent(
++            pattern = selectedPattern!!,
++            onBackClick = { selectedPattern = null },
++            onUpdate = { updated ->
++                val index = patternList.indexOfFirst { it.id == updated.id }
++                if (index != -1) patternList[index] = updated
++                selectedPattern = updated
++            },
++            onDelete = { deletedId ->
++                patternList.removeIf { it.id == deletedId }
++                selectedPattern = null
++            }
++        )
++    } else {
++        // 📋 도안 목록 화면
++        Column(
++            modifier = Modifier
++                .fillMaxSize()
++                .background(BgColor)
++                .padding(16.dp)
++        ) {
++            // 헤더 영역
++            Row(
++                modifier = Modifier.fillMaxWidth(),
++                horizontalArrangement = Arrangement.SpaceBetween,
++                verticalAlignment = Alignment.CenterVertically
++            ) {
++                Text(
++                    text = "도안 보관소 📂",
++                    fontSize = 22.sp,
++                    fontWeight = FontWeight.Bold,
++                    color = TextDark
++                )
++
++                FloatingActionButton(
++                    onClick = { showUploadDialog = true },
++                    containerColor = PointOrange,
++                    contentColor = Color.White,
++                    modifier = Modifier.size(44.dp)
++                ) {
++                    Icon(imageVector = Icons.Default.Add, contentDescription = "도안 업로드")
++                }
++            }
++
++            Spacer(modifier = Modifier.height(12.dp))
++
++            // 🔍 검색창 (2글자 이상 입력 안내)
++            OutlinedTextField(
++                value = searchQuery,
++                onValueChange = { searchQuery = it },
++                modifier = Modifier.fillMaxWidth(),
++                placeholder = { Text("도안 제목 또는 태그 검색 (2글자 이상)", fontSize = 13.sp) },
++                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
++                singleLine = true,
++                shape = RoundedCornerShape(12.dp),
++                colors = OutlinedTextFieldDefaults.colors(
++                    focusedBorderColor = PointOrange,
++                    unfocusedBorderColor = Color.LightGray
++                )
++            )
++
++            Spacer(modifier = Modifier.height(10.dp))
++
++            // 🏷️ 상태 필터 & 정렬 버튼
++            Row(
++                modifier = Modifier.fillMaxWidth(),
++                horizontalArrangement = Arrangement.SpaceBetween,
++                verticalAlignment = Alignment.CenterVertically
++            ) {
++                // 상태 필터 칩
++                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
++                    FilterChip(
++                        selected = selectedStatusFilter == null,
++                        onClick = { selectedStatusFilter = null },
++                        label = { Text("전체", fontSize = 11.sp) }
++                    )
++                    PatternStatus.entries.forEach { status ->
++                        FilterChip(
++                            selected = selectedStatusFilter == status,
++                            onClick = {
++                                selectedStatusFilter = if (selectedStatusFilter == status) null else status
++                            },
++                            label = { Text(status.label, fontSize = 11.sp) }
++                        )
++                    }
++                }
++
++                // 정렬 토글 버튼
++                TextButton(onClick = {
++                    selectedSortOrder = if (selectedSortOrder == PatternSortOrder.NEWEST) {
++                        PatternSortOrder.TITLE
++                    } else {
++                        PatternSortOrder.NEWEST
++                    }
++                }) {
++                    Text(text = "정렬: ${selectedSortOrder.label}", fontSize = 12.sp, color = PointOrange)
++                }
++            }
++
++            Spacer(modifier = Modifier.height(12.dp))
++
++            // 📦 도안 그리드 목록
++            if (filteredPatterns.isEmpty()) {
++                Box(
++                    modifier = Modifier.fillMaxSize(),
++                    contentAlignment = Alignment.Center
++                ) {
++                    Text("보관된 도안이 없습니다.", color = Color.Gray, fontSize = 14.sp)
++                }
++            } else {
++                LazyVerticalGrid(
++                    columns = GridCells.Fixed(2),
++                    horizontalArrangement = Arrangement.spacedBy(12.dp),
++                    verticalArrangement = Arrangement.spacedBy(12.dp)
++                ) {
++                    items(filteredPatterns, key = { it.id }) { item ->
++                        PatternCardItem(
++                            pattern = item,
++                            onClick = { selectedPattern = item }
++                        )
++                    }
++                }
++            }
++        }
++    }
++
++    // 📤 도안 업로드 다이얼로그
++    if (showUploadDialog) {
++        PatternUploadDialog(
++            onDismiss = { showUploadDialog = false },
++            onConfirm = { newPattern ->
++                patternList.add(0, newPattern)
++                showUploadDialog = false
++            }
++        )
++    }
++}
++
++// 🎴 도안 카드 아이템
++@Composable
++fun PatternCardItem(
++    pattern: PatternData,
++    onClick: () -> Unit
++) {
++    Card(
++        onClick = onClick,
++        shape = RoundedCornerShape(16.dp),
++        colors = CardDefaults.cardColors(containerColor = CardBg),
++        modifier = Modifier.fillMaxWidth()
++    ) {
++        Column(modifier = Modifier.padding(12.dp)) {
++            // 썸네일 영역 (가상 썸네일)
++            Box(
++                modifier = Modifier
++                    .fillMaxWidth()
++                    .height(100.dp)
++                    .background(Color(0xFFDCD7C9), shape = RoundedCornerShape(10.dp)),
++                contentAlignment = Alignment.Center
++            ) {
++                Text("📄 PDF / 이미지", fontSize = 12.sp, color = Color.Gray)
++            }
++
++            Spacer(modifier = Modifier.height(8.dp))
++
++            // 진행 상태 배지 & 태그
++            Row(
++                modifier = Modifier.fillMaxWidth(),
++                horizontalArrangement = Arrangement.SpaceBetween,
++                verticalAlignment = Alignment.CenterVertically
++            ) {
++                Surface(
++                    color = when (pattern.status) {
++                        PatternStatus.PLANNED -> Color(0xFFE0E0E0)
++                        PatternStatus.IN_PROGRESS -> PointOrange.copy(alpha = 0.2f)
++                        PatternStatus.COMPLETED -> Color(0xFF4CAF50).copy(alpha = 0.2f)
++                    },
++                    shape = RoundedCornerShape(6.dp)
++                ) {
++                    Text(
++                        text = pattern.status.label,
++                        fontSize = 10.sp,
++                        fontWeight = FontWeight.Bold,
++                        color = if (pattern.status == PatternStatus.IN_PROGRESS) PointOrange else TextDark,
++                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
++                    )
++                }
++
++                Text(text = "#${pattern.tag}", fontSize = 11.sp, color = Color.Gray)
++            }
++
++            Spacer(modifier = Modifier.height(4.dp))
++
++            // 제목
++            Text(
++                text = pattern.title,
++                fontSize = 14.sp,
++                fontWeight = FontWeight.Bold,
++                color = TextDark,
++                maxLines = 1
++            )
++        }
++    }
++}
++// 📄 도안 상세 화면
++@Composable
++fun PatternDetailContent(
++    pattern: PatternData,
++    onBackClick: () -> Unit,
++    onUpdate: (PatternData) -> Unit,
++    onDelete: (Long) -> Unit
++) {
++    var showDeleteDialog by remember { mutableStateOf(false) }
++
++    Column(
++        modifier = Modifier
++            .fillMaxSize()
++            .background(BgColor)
++            .padding(20.dp)
++    ) {
++        TextButton(onClick = onBackClick) {
++            Text("< 도안 목록으로", color = PointOrange, fontWeight = FontWeight.Bold)
++        }
++
++        Spacer(modifier = Modifier.height(8.dp))
++
++        Text(text = "#${pattern.tag}", fontSize = 12.sp, color = PointOrange)
++        Text(text = pattern.title, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = TextDark)
++        Text(text = pattern.info, fontSize = 14.sp, color = Color.Gray)
++
++        Spacer(modifier = Modifier.height(16.dp))
++
++        // 뷰어 버튼
++        Button(
++            onClick = { /* PDF 또는 이미지 뷰어 액션 */ },
++            modifier = Modifier.fillMaxWidth().height(50.dp),
++            colors = ButtonDefaults.buttonColors(containerColor = PointOrange),
++            shape = RoundedCornerShape(12.dp)
++        ) {
++            Text("📄 도안 파일 열기 (PDF/이미지)", color = Color.White, fontWeight = FontWeight.Bold)
++        }
++
++        Spacer(modifier = Modifier.weight(1f))
++
++        Row(
++            modifier = Modifier.fillMaxWidth(),
++            horizontalArrangement = Arrangement.spacedBy(8.dp)
++        ) {
++            OutlinedButton(
++                onClick = { showDeleteDialog = true },
++                modifier = Modifier.weight(1f),
++                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red)
++            ) {
++                Text("삭제하기")
++            }
++        }
++    }
++
++    if (showDeleteDialog) {
++        AlertDialog(
++            onDismissRequest = { showDeleteDialog = false },
++            title = { Text("도안 삭제", fontWeight = FontWeight.Bold) },
++            text = { Text("\"${pattern.title}\" 도안을 정말 삭제하시겠습니까?") },
++            confirmButton = {
++                Button(
++                    onClick = { onDelete(pattern.id) },
++                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
++                ) {
++                    Text("삭제", color = Color.White)
++                }
++            },
++            dismissButton = {
++                TextButton(onClick = { showDeleteDialog = false }) { Text("취소") }
++            }
++        )
++    }
++}
++
++// 📤 도안 업로드 다이얼로그
++@Composable
++fun PatternUploadDialog(
++    onDismiss: () -> Unit,
++    onConfirm: (PatternData) -> Unit
++) {
++    var title by remember { mutableStateOf("") }
++    var info by remember { mutableStateOf("") }
++    var tag by remember { mutableStateOf("") }
++    var status by remember { mutableStateOf(PatternStatus.PLANNED) }
++
++    AlertDialog(
++        onDismissRequest = onDismiss,
++        title = { Text("새 도안 업로드", fontWeight = FontWeight.Bold) },
++        text = {
++            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
++                OutlinedTextField(
++                    value = title,
++                    onValueChange = { title = it },
++                    label = { Text("도안 제목") },
++                    singleLine = true
++                )
++                OutlinedTextField(
++                    value = tag,
++                    onValueChange = { tag = it },
++                    label = { Text("태그 (예: 목도리, 가디건)") },
++                    singleLine = true
++                )
++                OutlinedTextField(
++                    value = info,
++                    onValueChange = { info = it },
++                    label = { Text("설명 (실, 바늘 정보 등)") }
++                )
++            }
++        },
++        confirmButton = {
++            Button(
++                onClick = {
++                    if (title.isNotBlank()) {
++                        onConfirm(
++                            PatternData(
++                                title = title,
++                                info = info,
++                                tag = tag,
++                                status = status
++                            )
++                        )
++                    }
++                },
++                colors = ButtonDefaults.buttonColors(containerColor = PointOrange)
++            ) {
++                Text("업로드", color = Color.White)
++            }
++        },
++        dismissButton = {
++            TextButton(onClick = onDismiss) { Text("취소", color = Color.Gray) }
++        }
++    )
++}
+\ No newline at end of file
