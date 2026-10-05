@@ -1,4 +1,4 @@
-package com.example.project_s
+package com.konit.hankovillage
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -10,7 +10,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme {
-                // 📱 5개 탭 바가 뚫린 메인 뼈대 화면을 띄웁니다!
                 MainScreen()
             }
         }

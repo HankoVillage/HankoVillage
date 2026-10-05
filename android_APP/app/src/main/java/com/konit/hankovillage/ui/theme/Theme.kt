@@ -1,8 +1,7 @@
-package com.example.project_s.ui.theme
+package com.konit.hankovillage.ui.theme
 
 // 글꼴 색상 디자인 미리 결정하는 테마
 
-import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme

@@ -1,6 +1,6 @@
-package com.example.project_s
+package com.konit.hankovillage
 
-// 📌 메모(memo) 속성 추가
+// 메모(memo) 속성 추가
 data class ProjectData(
     val id: Long = System.currentTimeMillis(), // 고유 ID
     var title: String,         // 작품 이름
@@ -9,5 +9,5 @@ data class ProjectData(
     var currentCount: Int,     // 현재 진행 단수
     var targetCount: Int,      // 목표 단수
     var status: String = "진행", // 진행 상태
-    var memo: String = ""      // 📝 뜨개 메모 필드 추가!
+    var memo: String = ""      // 뜨개 메모
 )
