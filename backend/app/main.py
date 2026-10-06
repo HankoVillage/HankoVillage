@@ -1,8 +1,15 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException
+from sqlalchemy.orm import Session
+from sqlalchemy import text
+from app.db import get_db
 
 app = FastAPI()
 
 
 @app.get("/health")
-async def health():
-    return {"status": "ok"}
+def health(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception:
+        raise HTTPException(status_code=503, detail={"status": "error", "db": "unreachable"})
+    return {"status": "ok", "db": "ok"}
