@@ -29,10 +29,20 @@ val CardBg = Color(0xFFEFECE1)
 val PointOrange = Color(0xFFD36D33)
 val TextDark = Color(0xFF332D29)
 
+/**
+ * 마이페이지 내 세부 서브 화면 이동을 위한 내비게이션 상태 정의
+ */
 enum class ProfileSubScreen {
     NONE, EDIT_PROFILE, MY_POSTS, LIKED_POSTS, NOTIFICATION_SETTINGS
 }
 
+/**
+ * 마이페이지 메인 화면 컴포저블
+ *
+ * @param userProfile 사용자 프로필 데이터
+ * @param onUpdateProfile 프로필 정보 수정 완료 시 호출되는 콜백
+ * @param onLogout 로그아웃 시 호출되는 콜백
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
@@ -42,10 +52,8 @@ fun ProfileScreen(
 ) {
     val context = LocalContext.current
 
-    // 전달받은 userProfile 상태 동적 관리
     var profile by remember(userProfile) { mutableStateOf(userProfile) }
 
-    // 완성작 갤러리 더미 데이터
     val completedWorks = remember {
         listOf(
             CompletedWork(1L, "가을 체크 머플러"),
@@ -54,10 +62,9 @@ fun ProfileScreen(
         )
     }
 
-    // 작성한 글 / 좋아요한 글 더미 데이터
     val myPosts = remember {
         mutableStateListOf(
-            "이번에 완성한 대바늘 꽈배기 니트 뽐냅니다! 🧶",
+            "이번에 완성한 대바늘 꽈배기 니트 뽐냅니다!",
             "동대문 종합시장 실 쇼핑 후기"
         )
     }
@@ -78,7 +85,6 @@ fun ProfileScreen(
 
     when (currentSubScreen) {
         ProfileSubScreen.EDIT_PROFILE -> {
-            // ✏️ 프로필 수정 화면
             EditProfileContent(
                 profile = profile,
                 onBack = { currentSubScreen = ProfileSubScreen.NONE },
@@ -91,7 +97,6 @@ fun ProfileScreen(
             )
         }
         ProfileSubScreen.MY_POSTS -> {
-            // 📝 작성한 게시글 화면
             SimplePostListContent(
                 title = "작성한 게시글",
                 posts = myPosts,
@@ -99,7 +104,6 @@ fun ProfileScreen(
             )
         }
         ProfileSubScreen.LIKED_POSTS -> {
-            // ❤️ 좋아요한 게시글 화면
             SimplePostListContent(
                 title = "좋아요한 게시글",
                 posts = likedPosts,
@@ -107,7 +111,6 @@ fun ProfileScreen(
             )
         }
         ProfileSubScreen.NOTIFICATION_SETTINGS -> {
-            // 🔔 알림 설정 화면
             NotificationSettingsContent(
                 profile = profile,
                 onBack = { currentSubScreen = ProfileSubScreen.NONE },
@@ -124,7 +127,6 @@ fun ProfileScreen(
             )
         }
         ProfileSubScreen.NONE -> {
-            // 👤 내 프로필 메인 화면
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -133,7 +135,7 @@ fun ProfileScreen(
                     .verticalScroll(rememberScrollState())
             ) {
                 Text(
-                    text = "내 프로필 👤",
+                    text = "내 프로필",
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextDark
@@ -141,7 +143,6 @@ fun ProfileScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // 프로필 카드 영역
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
@@ -153,7 +154,6 @@ fun ProfileScreen(
                             .padding(16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // 프로필 사진
                         Box(
                             modifier = Modifier
                                 .size(80.dp)
@@ -202,9 +202,8 @@ fun ProfileScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // 🏆 완성작 갤러리
                 Text(
-                    text = "완성작 갤러리 🏆 (${completedWorks.size})",
+                    text = "완성작 갤러리 (${completedWorks.size})",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextDark
@@ -245,7 +244,7 @@ fun ProfileScreen(
                                             .background(Color(0xFFDCD7C9)),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text("🖼️", fontSize = 20.sp)
+                                        Text("사진", fontSize = 12.sp, color = Color.Gray)
                                     }
                                     Surface(
                                         modifier = Modifier.fillMaxWidth(),
@@ -267,7 +266,6 @@ fun ProfileScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // ⚙️ 메뉴 리스트
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
@@ -314,7 +312,6 @@ fun ProfileScreen(
         }
     }
 
-    // 🚪 로그아웃 확인 팝업
     if (showLogoutDialog) {
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },
@@ -340,7 +337,6 @@ fun ProfileScreen(
         )
     }
 
-    // ⚠️ 회원 탈퇴 안내 및 동의 팝업
     if (showDeleteAccountDialog) {
         DeleteAccountDialog(
             onDismiss = { showDeleteAccountDialog = false },
@@ -353,7 +349,14 @@ fun ProfileScreen(
     }
 }
 
-// 📌 메뉴 항목 컴포저블
+/**
+ * 프로필 메뉴 항목 아이템 컴포저블
+ *
+ * @param icon 메뉴 아이콘
+ * @param title 메뉴 제목
+ * @param titleColor 메뉴 텍스트 색상
+ * @param onClick 메뉴 선택 시 콜백
+ */
 @Composable
 fun ProfileMenuItem(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -378,7 +381,13 @@ fun ProfileMenuItem(
     }
 }
 
-// ✏️ 프로필 수정 화면
+/**
+ * 프로필 수정 화면 컴포저블
+ *
+ * @param profile 기존 프로필 데이터
+ * @param onBack 이전 화면 전환 콜백
+ * @param onSave 수정 데이터 저장 콜백
+ */
 @Composable
 fun EditProfileContent(
     profile: UserProfileData,
@@ -421,16 +430,15 @@ fun EditProfileContent(
             }
         }
 
-        Text("프로필 수정 ✏️", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextDark)
+        Text("프로필 수정", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextDark)
 
-        // 사진 수정
         Box(
             modifier = Modifier
                 .size(90.dp)
                 .align(Alignment.CenterHorizontally)
                 .clip(CircleShape)
                 .background(Color(0xFFDCD7C9))
-                .clickable { /* 사진 선택/촬영 */ },
+                .clickable { },
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -439,7 +447,6 @@ fun EditProfileContent(
             }
         }
 
-        // 닉네임 수정 및 중복 확인
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -479,7 +486,13 @@ fun EditProfileContent(
     }
 }
 
-// 📝/❤️ 게시글 목록 간단 조회 화면
+/**
+ * 작성한 글 / 좋아요한 글의 목록을 보여주는 컴포저블
+ *
+ * @param title 목록 화면 제목
+ * @param posts 게시글 제목 리스트
+ * @param onBack 뒤로가기 콜백
+ */
 @Composable
 fun SimplePostListContent(
     title: String,
@@ -511,7 +524,7 @@ fun SimplePostListContent(
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { /* 게시글 상세 이동 */ },
+                            .clickable { },
                         colors = CardDefaults.cardColors(containerColor = CardBg),
                         shape = RoundedCornerShape(10.dp)
                     ) {
@@ -529,7 +542,14 @@ fun SimplePostListContent(
     }
 }
 
-// 🔔 알림 설정 화면
+/**
+ * 푸시 알림 수신 여부를 설정하는 화면 컴포저블
+ *
+ * @param profile 사용자 프로필 및 알림 설정 데이터
+ * @param onBack 뒤로가기 콜백
+ * @param onToggleComment 댓글 알림 토글 콜백
+ * @param onToggleLike 좋아요 알림 토글 콜백
+ */
 @Composable
 fun NotificationSettingsContent(
     profile: UserProfileData,
@@ -547,7 +567,7 @@ fun NotificationSettingsContent(
             IconButton(onClick = onBack) {
                 Icon(Icons.Default.ArrowBack, contentDescription = "뒤로가기")
             }
-            Text("알림 설정 🔔", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextDark)
+            Text("알림 설정", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextDark)
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -598,7 +618,12 @@ fun NotificationSettingsContent(
     }
 }
 
-// ⚠️ 회원 탈퇴 안내 팝업
+/**
+ * 회원 탈퇴 안내 및 최종 동의를 확인하는 팝업 다이얼로그
+ *
+ * @param onDismiss 다이얼로그 닫기 콜백
+ * @param onConfirmDelete 회원 탈퇴 확정 콜백
+ */
 @Composable
 fun DeleteAccountDialog(
     onDismiss: () -> Unit,
@@ -612,7 +637,7 @@ fun DeleteAccountDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    "정말로 탈퇴하시겠습니까?\n\n⚠️ 작성한 글·댓글은 '탈퇴한 사용자'로 남아요.",
+                    "정말로 탈퇴하시겠습니까?\n\n작성한 글·댓글은 '탈퇴한 사용자'로 남습니다.",
                     fontSize = 13.sp,
                     color = TextDark,
                     lineHeight = 18.sp

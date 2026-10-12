@@ -29,6 +29,12 @@ import com.konit.hankovillage.ui.pattern.PatternScreen
 import com.konit.hankovillage.ui.profile.ProfileScreen
 import com.konit.hankovillage.ui.yarn.YarnScreen
 
+/**
+ * 하단 네비게이션 바의 탭 메뉴 항목 데이터 모델
+ *
+ * @property title 탭에 표시될 텍스트
+ * @property route 네비게이션 라우팅 경로
+ */
 sealed class BottomNavItem(val title: String, val route: String) {
     object Home : BottomNavItem("단수카운터", "home")
     object Pattern : BottomNavItem("도안 보관", "pattern")
@@ -37,16 +43,18 @@ sealed class BottomNavItem(val title: String, val route: String) {
     object Yarn : BottomNavItem("실 보관소", "yarn")
 }
 
+/**
+ * 앱의 메인 화면 컴포저블
+ *
+ * 하단 네비게이션 바 제어, 사용자 로그인 세션 관리 및 비회원 접근 제한 권한을 제어합니다.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen() {
     val navController = rememberNavController()
     var selectedTab by remember { mutableStateOf<BottomNavItem>(BottomNavItem.Home) }
 
-    // 💡 로그인 유저 세션 관리 (null일 경우 비회원 둘러보기 상태)
     var currentUserSession by remember { mutableStateOf<UserSession?>(null) }
-
-    // 🔒 비회원 제한 기능(도안/실 보관소) 접근 시 로그인 유도 다이얼로그 상태
     var showLoginAuthDialog by remember { mutableStateOf(false) }
 
     val projectList = remember {
@@ -85,8 +93,6 @@ fun MainScreen() {
                         onClick = {
                             val isLoggedIn = currentUserSession != null
 
-                            // 🔒 비회원(로그아웃)일 때 회원 전용 탭(도안 보관소, 실 보관소) 누르면 접근 제어
-                            // 💡 단수카운터(Home)와 커뮤니티(Community)는 비회원도 둘러보기 가능!
                             if (!isLoggedIn && (item == BottomNavItem.Pattern || item == BottomNavItem.Yarn)) {
                                 showLoginAuthDialog = true
                             } else {
@@ -125,17 +131,14 @@ fun MainScreen() {
             startDestination = BottomNavItem.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            // 🧶 실 보관소 (회원 전용)
             composable(BottomNavItem.Yarn.route) {
                 YarnScreen()
             }
 
-            // 📂 도안 보관소 (회원 전용)
             composable(BottomNavItem.Pattern.route) {
                 PatternScreen()
             }
 
-            // ⏱️ 단수 카운터 (비회원/회원 모두 둘러보기 가능)
             composable(BottomNavItem.Home.route) {
                 if (selectedProject == null) {
                     ProjectListScreen(
@@ -156,7 +159,6 @@ fun MainScreen() {
                 }
             }
 
-            // 💬 커뮤니티 (비회원/회원 모두 둘러보기 가능)
             composable(BottomNavItem.Community.route) {
                 CommunityScreen(
                     isLoggedIn = currentUserSession != null,
@@ -164,7 +166,6 @@ fun MainScreen() {
                 )
             }
 
-            // 👤 프로필 (비회원 시 소셜 로그인 화면)
             composable(BottomNavItem.Profile.route) {
                 val currentSession = currentUserSession
                 if (currentSession == null) {
@@ -194,7 +195,6 @@ fun MainScreen() {
         }
     }
 
-    // 🔒 도안/실 보관소 탭 클릭 시 표시되는 로그인 유도 팝업
     if (showLoginAuthDialog) {
         AlertDialog(
             onDismissRequest = { showLoginAuthDialog = false },
