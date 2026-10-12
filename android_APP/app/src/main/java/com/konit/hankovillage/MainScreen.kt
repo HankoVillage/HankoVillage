@@ -14,23 +14,21 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.konit.hankovillage.ui.counter.ProjectListScreen
+import com.konit.hankovillage.ui.auth.LoginScreen
+import com.konit.hankovillage.ui.auth.UserSession
+import com.konit.hankovillage.ui.community.CommunityScreen
 import com.konit.hankovillage.ui.counter.CounterScreen
 import com.konit.hankovillage.ui.counter.ProjectData
+import com.konit.hankovillage.ui.counter.ProjectListScreen
 import com.konit.hankovillage.ui.pattern.PatternScreen
+import com.konit.hankovillage.ui.profile.ProfileScreen
 import com.konit.hankovillage.ui.yarn.YarnScreen
 
-
-/**
- * 앱의 하단 네비게이션 탭 아이템 정의
- *
- * @property title 탭에 표시될 타이틀
- * @property route 네비게이션 경로
- */
 sealed class BottomNavItem(val title: String, val route: String) {
     object Home : BottomNavItem("단수카운터", "home")
     object Pattern : BottomNavItem("도안 보관", "pattern")
@@ -39,14 +37,17 @@ sealed class BottomNavItem(val title: String, val route: String) {
     object Yarn : BottomNavItem("실 보관소", "yarn")
 }
 
-/**
- * 앱의 메인 화면 구조 및 네비게이션 바를 구성하는 컴포저블
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen() {
     val navController = rememberNavController()
     var selectedTab by remember { mutableStateOf<BottomNavItem>(BottomNavItem.Home) }
+
+    // 💡 로그인 유저 세션 관리 (null일 경우 비회원 둘러보기 상태)
+    var currentUserSession by remember { mutableStateOf<UserSession?>(null) }
+
+    // 🔒 비회원 제한 기능(도안/실 보관소) 접근 시 로그인 유도 다이얼로그 상태
+    var showLoginAuthDialog by remember { mutableStateOf(false) }
 
     val projectList = remember {
         mutableStateListOf(
@@ -82,11 +83,19 @@ fun MainScreen() {
                     NavigationBarItem(
                         selected = selectedTab == item,
                         onClick = {
-                            selectedTab = item
-                            navController.navigate(item.route) {
-                                popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
+                            val isLoggedIn = currentUserSession != null
+
+                            // 🔒 비회원(로그아웃)일 때 회원 전용 탭(도안 보관소, 실 보관소) 누르면 접근 제어
+                            // 💡 단수카운터(Home)와 커뮤니티(Community)는 비회원도 둘러보기 가능!
+                            if (!isLoggedIn && (item == BottomNavItem.Pattern || item == BottomNavItem.Yarn)) {
+                                showLoginAuthDialog = true
+                            } else {
+                                selectedTab = item
+                                navController.navigate(item.route) {
+                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
                             }
                         },
                         label = { Text(item.title) },
@@ -116,6 +125,17 @@ fun MainScreen() {
             startDestination = BottomNavItem.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
+            // 🧶 실 보관소 (회원 전용)
+            composable(BottomNavItem.Yarn.route) {
+                YarnScreen()
+            }
+
+            // 📂 도안 보관소 (회원 전용)
+            composable(BottomNavItem.Pattern.route) {
+                PatternScreen()
+            }
+
+            // ⏱️ 단수 카운터 (비회원/회원 모두 둘러보기 가능)
             composable(BottomNavItem.Home.route) {
                 if (selectedProject == null) {
                     ProjectListScreen(
@@ -136,23 +156,71 @@ fun MainScreen() {
                 }
             }
 
-            composable(BottomNavItem.Pattern.route) {
-                PatternScreen()
-            }
-
-            composable(BottomNavItem.Yarn.route) {
-                YarnScreen()
-            }
-
+            // 💬 커뮤니티 (비회원/회원 모두 둘러보기 가능)
             composable(BottomNavItem.Community.route) {
-                Text("프로필 화면 (준비 중)", modifier = Modifier.padding(16.dp))
+                CommunityScreen(
+                    isLoggedIn = currentUserSession != null,
+                    currentNickname = currentUserSession?.profile?.nickname ?: "익명"
+                )
             }
 
+            // 👤 프로필 (비회원 시 소셜 로그인 화면)
             composable(BottomNavItem.Profile.route) {
-                Text("프로필 화면 (준비 중)", modifier = Modifier.padding(16.dp))
+                val currentSession = currentUserSession
+                if (currentSession == null) {
+                    LoginScreen(
+                        onLoginSuccess = { session ->
+                            currentUserSession = session
+                        },
+                        onGuestMode = {
+                            selectedTab = BottomNavItem.Home
+                            navController.navigate(BottomNavItem.Home.route)
+                        }
+                    )
+                } else {
+                    ProfileScreen(
+                        userProfile = currentSession.profile,
+                        onUpdateProfile = { updatedProfile ->
+                            currentUserSession = currentUserSession?.copy(profile = updatedProfile)
+                        },
+                        onLogout = {
+                            currentUserSession = null
+                            selectedTab = BottomNavItem.Home
+                            navController.navigate(BottomNavItem.Home.route)
+                        }
+                    )
+                }
             }
-
-
         }
+    }
+
+    // 🔒 도안/실 보관소 탭 클릭 시 표시되는 로그인 유도 팝업
+    if (showLoginAuthDialog) {
+        AlertDialog(
+            onDismissRequest = { showLoginAuthDialog = false },
+            title = { Text("로그인 필요", fontWeight = FontWeight.Bold) },
+            text = { Text("도안 보관소와 실 보관소는 로그인 후 이용할 수 있습니다. 로그인하시겠습니까?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showLoginAuthDialog = false
+                        selectedTab = BottomNavItem.Profile
+                        navController.navigate(BottomNavItem.Profile.route) {
+                            popUpTo(navController.graph.startDestinationId) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = pointOrangeColor)
+                ) {
+                    Text("로그인하러 가기", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLoginAuthDialog = false }) {
+                    Text("취소", color = Color.Gray)
+                }
+            }
+        )
     }
 }
