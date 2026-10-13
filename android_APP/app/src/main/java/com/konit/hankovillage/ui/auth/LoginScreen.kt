@@ -85,9 +85,9 @@ fun LoginScreen(
                         onSuccess = { email, nickname, profileImage ->
                             isLoading = false
                             val session = UserSession(
-                                userId = email, // 또는 서버 발급 임시 ID
-                                provider = "kakao", // 카카오 로그인일 경우 "kakao", 구글일 경우 "google"
-                                providerId = email, // 전달받은 고유 ID (또는 임시 값)
+                                userId = email,
+                                provider = "kakao",
+                                providerId = email,
                                 profile = UserProfileData(
                                     nickname = nickname,
                                     bio = "카카오로 로그인한 뜨개이웃",
@@ -134,9 +134,9 @@ fun LoginScreen(
                         onSuccess = { email, nickname, profileImage ->
                             isLoading = false
                             val session = UserSession(
-                                userId = email,             // 내부 사용 ID (임시값)
-                                provider = "google",        // 구글 로그인 구분을 위한 "google"
-                                providerId = email,         // 구글 고유 ID (또는 전달받은 id)
+                                userId = email,
+                                provider = "google",
+                                providerId = email,
                                 profile = UserProfileData(
                                     nickname = nickname,
                                     bio = "구글 계정으로 시작한 뜨개이웃",

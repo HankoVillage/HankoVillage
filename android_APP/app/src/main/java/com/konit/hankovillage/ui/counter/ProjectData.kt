@@ -1,19 +1,49 @@
 package com.konit.hankovillage.ui.counter
 
-import android.os.Parcelable
-import kotlinx.parcelize.Parcelize
+import androidx.compose.runtime.saveable.Saver
 
 /**
- * 단수 카운터 및 프로젝트 관리를 위한 데이터 모델
+ * 프로젝트 카운터 데이터 모델
  */
-@Parcelize
 data class ProjectData(
-    val id: Long,               // 프로젝트 고유 ID
-    val title: String,          // 프로젝트 제목
-    val category: String,       // 카테고리
-    val yarnAndNeedle: String,  // 실 및 바늘 정보
-    val currentRows: Int,       // 현재 진행 단수
-    val totalRows: Int,         // 목표 전체 단수
-    val status: String,         // 진행 상태
-    val memo: String            // 메모 내용
-) : Parcelable
+    val id: Long = System.currentTimeMillis(),
+    val title: String,
+    val needleType: String,
+    val yarnAndNeedle: String,
+    val currentRows: Int,
+    val totalRows: Int,
+    val status: String,
+    val memo: String
+)
+
+/**
+ * Nullable ProjectData? 전용 Saver (rememberSaveable 타입 에러 완벽 해결)
+ */
+val ProjectDataSaver = Saver<ProjectData?, List<Any>>(
+    save = { project ->
+        if (project == null) emptyList()
+        else listOf(
+            project.id,
+            project.title,
+            project.needleType,
+            project.yarnAndNeedle,
+            project.currentRows,
+            project.totalRows,
+            project.status,
+            project.memo
+        )
+    },
+    restore = { list ->
+        if (list.isEmpty()) null
+        else ProjectData(
+            id = list[0] as Long,
+            title = list[1] as String,
+            needleType = list[2] as String,
+            yarnAndNeedle = list[3] as String,
+            currentRows = list[4] as Int,
+            totalRows = list[5] as Int,
+            status = list[6] as String,
+            memo = list[7] as String
+        )
+    }
+)

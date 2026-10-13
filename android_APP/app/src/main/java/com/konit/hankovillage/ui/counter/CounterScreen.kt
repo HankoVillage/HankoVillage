@@ -26,13 +26,17 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-val BgColor = Color(0xFFF7F4EB)
-val CardBg = Color(0xFFEFECE1)
-val PointOrange = Color(0xFFD36D33)
-val TextDark = Color(0xFF332D29)
+private val BgColor = Color(0xFFF7F4EB)
+private val CardBg = Color(0xFFEFECE1)
+private val TextDark = Color(0xFF332D29)
+private val PointOrange = Color(0xFFD36D33)
 
 /**
  * 카운터 단수별 메모 항목 데이터 모델
+ *
+ * @property id 메모 고유 식별자 (기본값: 생성 타임스탬프)
+ * @property count 메모가 작성된 시점의 단수
+ * @property text 메모 내용
  */
 data class MemoItem(
     val id: Long = System.currentTimeMillis(),
@@ -41,7 +45,11 @@ data class MemoItem(
 )
 
 /**
- * 뜨개질 프로젝트의 진행 단수 카운팅 및 메모 관리 화면 컴포저블
+ * 뜨개질 프로젝트의 진행 단수 카운팅 및 메모 관리를 담당하는 화면 컴포저블
+ *
+ * @param project 현재 카운팅 중인 프로젝트 데이터 객체
+ * @param onBackClick 뒤로가기 클릭 이벤트 콜백
+ * @param onSaveProject 수정 및 카운팅된 프로젝트 저장 콜백
  */
 @Composable
 fun CounterScreen(
@@ -56,7 +64,7 @@ fun CounterScreen(
     var isKeepScreenOn by remember { mutableStateOf(true) }
     val context = LocalContext.current
 
-    // 화면 꺼짐 방지 플래그 제어
+    // 뜨개질 진행 중 화면이 꺼지지 않도록 윈도우 플래그 제어
     DisposableEffect(isKeepScreenOn) {
         val window = (context as? Activity)?.window
         if (isKeepScreenOn) {
@@ -70,18 +78,16 @@ fun CounterScreen(
         }
     }
 
-    // 프로젝트 정보 상태 동기화
     var title by remember(project.id) { mutableStateOf(project.title) }
-    var info by remember(project.id) { mutableStateOf(project.info) }
-    var currentCount by remember(project.id) { mutableIntStateOf(project.currentCount) }
-    var targetCount by remember(project.id) { mutableIntStateOf(project.targetCount) }
-
+    var yarnAndNeedle by remember(project.id) { mutableStateOf(project.yarnAndNeedle) }
+    var currentRows by remember(project.id) { mutableIntStateOf(project.currentRows) }
+    var totalRows by remember(project.id) { mutableIntStateOf(project.totalRows) }
     val memoList = remember { mutableStateListOf<MemoItem>() }
 
     LaunchedEffect(project.id) {
         memoList.clear()
         if (project.memo.isNotBlank()) {
-            memoList.add(MemoItem(count = currentCount, text = project.memo))
+            memoList.add(MemoItem(count = currentRows, text = project.memo))
         }
     }
 
@@ -96,8 +102,8 @@ fun CounterScreen(
     var showEditDialog by remember { mutableStateOf(false) }
     var showResetDialog by remember { mutableStateOf(false) }
 
-    val progress = if (targetCount > 0) (currentCount.toFloat() / targetCount.toFloat()).coerceIn(0f, 1f) else 0f
-    val remainingCount = (targetCount - currentCount).coerceAtLeast(0)
+    val progress = if (totalRows > 0) (currentRows.toFloat() / totalRows.toFloat()).coerceIn(0f, 1f) else 0f
+    val remainingCount = (totalRows - currentRows).coerceAtLeast(0)
 
     val scrollState = rememberScrollState()
 
@@ -109,7 +115,6 @@ fun CounterScreen(
             .verticalScroll(scrollState)
             .imePadding()
     ) {
-        // 상단 바: 취소 및 저장 버튼
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -123,9 +128,9 @@ fun CounterScreen(
                 onClick = {
                     val updatedProject = project.copy(
                         title = title,
-                        info = info,
-                        currentCount = currentCount,
-                        targetCount = targetCount,
+                        yarnAndNeedle = yarnAndNeedle,
+                        currentRows = currentRows,
+                        totalRows = totalRows,
                         memo = memoList.lastOrNull()?.text ?: project.memo
                     )
                     onSaveProject(updatedProject)
@@ -146,14 +151,13 @@ fun CounterScreen(
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = "진행 중인 작업", fontSize = 12.sp, color = PointOrange, fontWeight = FontWeight.Bold)
                 Text(text = title, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextDark)
-                Text(text = info, fontSize = 13.sp, color = Color.Gray)
+                Text(text = yarnAndNeedle, fontSize = 13.sp, color = Color.Gray)
             }
 
             Row(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 초기화 버튼
                 OutlinedButton(
                     onClick = { showResetDialog = true },
                     modifier = Modifier.height(38.dp),
@@ -223,13 +227,13 @@ fun CounterScreen(
             ) {
                 Text(text = "현재 단수", fontSize = 14.sp, color = TextDark)
                 Text(
-                    text = "$currentCount",
+                    text = "$currentRows",
                     fontSize = 64.sp,
                     fontWeight = FontWeight.Black,
                     color = PointOrange
                 )
 
-                Text(text = "목표 ${targetCount}단", fontSize = 14.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
+                Text(text = "목표 ${totalRows}단", fontSize = 14.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
 
                 Spacer(modifier = Modifier.height(12.dp))
 
@@ -258,8 +262,8 @@ fun CounterScreen(
         ) {
             Button(
                 onClick = {
-                    if (currentCount > 0) {
-                        currentCount--
+                    if (currentRows > 0) {
+                        currentRows--
                     }
                 },
                 modifier = Modifier.weight(1f).height(60.dp),
@@ -271,7 +275,7 @@ fun CounterScreen(
 
             Button(
                 onClick = {
-                    currentCount++
+                    currentRows++
                 },
                 modifier = Modifier.weight(2f).height(60.dp),
                 shape = RoundedCornerShape(16.dp),
@@ -477,7 +481,7 @@ fun CounterScreen(
     if (showMemoDialog) {
         AlertDialog(
             onDismissRequest = { showMemoDialog = false },
-            title = { Text("메모 작성 (${currentCount}단)", fontWeight = FontWeight.Bold) },
+            title = { Text("메모 작성 (${currentRows}단)", fontWeight = FontWeight.Bold) },
             text = {
                 OutlinedTextField(
                     value = newMemoText,
@@ -491,7 +495,7 @@ fun CounterScreen(
                 Button(
                     onClick = {
                         if (newMemoText.isNotBlank()) {
-                            memoList.add(MemoItem(count = currentCount, text = newMemoText))
+                            memoList.add(MemoItem(count = currentRows, text = newMemoText))
                             newMemoText = ""
                         }
                         showMemoDialog = false
@@ -529,7 +533,7 @@ fun CounterScreen(
                     onClick = {
                         val targetIndex = memoList.indexOfFirst { it.id == editingMemo?.id }
                         if (targetIndex != -1 && editMemoText.isNotBlank()) {
-                            memoList[targetIndex] = memoList[targetIndex].copy(text = editMemoText)
+                            memoList[targetIndex].text = editMemoText
                         }
                         editingMemo = null
                     },
@@ -578,7 +582,7 @@ fun CounterScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        currentCount = 0
+                        currentRows = 0
                         showResetDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = PointOrange)
@@ -594,9 +598,9 @@ fun CounterScreen(
 
     if (showEditDialog) {
         var editTitle by remember { mutableStateOf(title) }
-        var editInfo by remember { mutableStateOf(info) }
-        var editCurrent by remember { mutableStateOf(currentCount.toString()) }
-        var editTarget by remember { mutableStateOf(targetCount.toString()) }
+        var editYarnAndNeedle by remember { mutableStateOf(yarnAndNeedle) }
+        var editCurrent by remember { mutableStateOf(currentRows.toString()) }
+        var editTarget by remember { mutableStateOf(totalRows.toString()) }
 
         AlertDialog(
             onDismissRequest = { showEditDialog = false },
@@ -606,21 +610,25 @@ fun CounterScreen(
                     OutlinedTextField(
                         value = editTitle,
                         onValueChange = { editTitle = it },
-                        label = { Text("작품 이름") }, singleLine = true
+                        label = { Text("작품 이름") },
+                        singleLine = true
                     )
                     OutlinedTextField(
-                        value = editInfo,
-                        onValueChange = { editInfo = it },
-                        label = { Text("실 · 바늘 정보") }, singleLine = true
+                        value = editYarnAndNeedle,
+                        onValueChange = { editYarnAndNeedle = it },
+                        label = { Text("실 · 바늘 정보") },
+                        singleLine = true
                     )
                     OutlinedTextField(
-                        value = editCurrent, onValueChange = { editCurrent = it },
+                        value = editCurrent,
+                        onValueChange = { editCurrent = it },
                         label = { Text("현재 단수") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true
                     )
                     OutlinedTextField(
-                        value = editTarget, onValueChange = { editTarget = it },
+                        value = editTarget,
+                        onValueChange = { editTarget = it },
                         label = { Text("목표 단수") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true
@@ -630,9 +638,9 @@ fun CounterScreen(
             confirmButton = {
                 Button(onClick = {
                     title = editTitle
-                    info = editInfo
-                    currentCount = editCurrent.toIntOrNull() ?: currentCount
-                    targetCount = editTarget.toIntOrNull() ?: targetCount
+                    yarnAndNeedle = editYarnAndNeedle
+                    currentRows = editCurrent.toIntOrNull() ?: currentRows
+                    totalRows = editTarget.toIntOrNull() ?: totalRows
 
                     showEditDialog = false
                 }) {
@@ -640,7 +648,9 @@ fun CounterScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showEditDialog = false }) { Text("취소", color = Color.Gray) }
+                TextButton(onClick = { showEditDialog = false }) {
+                    Text("취소", color = Color.Gray)
+                }
             }
         )
     }

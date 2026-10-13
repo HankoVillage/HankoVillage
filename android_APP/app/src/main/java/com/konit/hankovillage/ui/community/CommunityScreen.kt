@@ -30,6 +30,11 @@ val TextDark = Color(0xFF332D29)
 
 /**
  * 커뮤니티 메인 화면 컴포저블
+ *
+ * @param postList 전체 커뮤니티 게시글 목록 데이터 (StateList)
+ * @param isLoggedIn 사용자 로그인 상태 여부
+ * @param currentNickname 현재 로그인한 사용자의 닉네임
+ * @param onRequireLogin 비회원 기능 제한 시 로그인 화면으로 이동하는 콜백
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,7 +44,6 @@ fun CommunityScreen(
     currentNickname: String = "김뜨개",
     onRequireLogin: () -> Unit = {}
 ) {
-    // 초기 더미 데이터 설정 (리스트가 비어있을 때 최초 1회만 초기화)
     LaunchedEffect(Unit) {
         if (postList.isEmpty()) {
             postList.add(
@@ -232,7 +236,10 @@ fun CommunityScreen(
 }
 
 /**
- * 게시글 항목 카드 컴포저블
+ * 게시글 목록 아이템 카드를 표시하는 컴포저블
+ *
+ * @param post 카드에 표시할 게시글 데이터
+ * @param onClick 게시글 카드 선택 시 실행할 콜백
  */
 @Composable
 fun PostCardItem(
@@ -304,7 +311,15 @@ fun PostCardItem(
 }
 
 /**
- * 게시글 상세 내용 및 댓글 영역 컴포저블
+ * 게시글 상세 내용 조회 및 댓글 관리를 제공하는 화면 컴포저블
+ *
+ * @param post 상세 조회할 게시글 데이터
+ * @param isLoggedIn 회원 로그인 여부
+ * @param currentNickname 현재 로그인 사용자의 닉네임
+ * @param onBack 목록 화면 복귀 콜백
+ * @param onEdit 게시글 수정 모드 전환 콜백
+ * @param onDelete 게시글 삭제 처리 콜백
+ * @param onRequireAuth 회원 전용 기능 동작 시 로그인 안내 콜백
  */
 @Composable
 fun PostDetailContent(
@@ -348,7 +363,6 @@ fun PostDetailContent(
             }
 
             Row {
-                // 💡 [수정] 로그인 상태이면서 작성 본인일 때만 수정/삭제 버튼 노출
                 if (isLoggedIn && post.isMyPost) {
                     IconButton(onClick = onEdit) {
                         Icon(Icons.Default.Edit, contentDescription = "수정", tint = TextDark)
@@ -614,7 +628,12 @@ fun PostDetailContent(
 }
 
 /**
- * 게시글 작성 및 수정 입력 양식 컴포저블
+ * 게시글 신규 등록 및 수정을 위한 입력 양식 컴포저블
+ *
+ * @param initialPost 수정 시 전달할 기존 게시글 객체 (신규 생성 시 null)
+ * @param currentNickname 현재 로그인 사용자의 닉네임
+ * @param onBack 화면 이탈 콜백
+ * @param onSave 게시글 작성/수정 저장 콜백
  */
 @Composable
 fun PostFormContent(
@@ -709,7 +728,9 @@ fun PostFormContent(
 }
 
 /**
- * 게시글/댓글 신고 사유 선택 다이얼로그
+ * 게시글 및 댓글 신고 사유 선택 다이얼로그
+ *
+ * @param onDismiss 다이얼로그 닫기 콜백
  */
 @Composable
 fun ReportDialog(onDismiss: () -> Unit) {

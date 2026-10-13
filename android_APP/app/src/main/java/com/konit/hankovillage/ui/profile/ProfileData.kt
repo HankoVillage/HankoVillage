@@ -8,7 +8,7 @@ data class UserProfileData(
     var likeNotification: Boolean = true
 )
 
-// 완성작 갤러리용 데이터 모델 (이 파일에만 선언)
+
 data class CompletedWork(
     val id: Long,
     val title: String,

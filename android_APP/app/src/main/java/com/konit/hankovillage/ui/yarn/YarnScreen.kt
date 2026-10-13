@@ -36,7 +36,6 @@ val TextDark = Color(0xFF332D29)
 fun YarnScreen(
     yarnList: SnapshotStateList<YarnData> = remember { mutableStateListOf() }
 ) {
-    // 초기 더미 데이터가 필요하다면 리스트가 비어있을 때 추가
     LaunchedEffect(Unit) {
         if (yarnList.isEmpty()) {
             yarnList.add(

@@ -18,13 +18,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+private val BgColor = Color(0xFFF7F4EB)
+private val CardBg = Color(0xFFEFECE1)
+private val TextDark = Color(0xFF332D29)
+private val PointOrange = Color(0xFFD36D33)
+
 /**
  * 등록된 프로젝트 카운터 목록을 조회하고, 신규 카운터를 추가하거나 선택/삭제하는 화면 컴포저블
  *
- * @param projectList 등록된 프로젝트 목록
+ * @param projectList 등록된 프로젝트 데이터 목록
  * @param onAddProject 프로젝트 추가 콜백
  * @param onDeleteProject 프로젝트 삭제 콜백
- * @param onProjectSelect 프로젝트 선택 콜백
+ * @param onProjectSelect 특정 프로젝트 선택 콜백
  */
 @Composable
 fun ProjectListScreen(
@@ -50,14 +55,13 @@ fun ProjectListScreen(
             }
             Button(
                 onClick = {
-                    // 팝업 다이얼로그 없이 바로 새 빈 프로젝트 객체를 만들어 상세/편집 화면으로 이동
                     val newProject = ProjectData(
                         id = System.currentTimeMillis(),
                         title = "새 프로젝트",
                         needleType = "대바늘",
-                        info = "실 · 바늘 정보를 입력해 주세요",
-                        currentCount = 0,
-                        targetCount = 100,
+                        yarnAndNeedle = "실 · 바늘 정보를 입력해 주세요",
+                        currentRows = 0,
+                        totalRows = 100,
                         status = "진행",
                         memo = ""
                     )
@@ -91,9 +95,9 @@ fun ProjectListScreen(
 /**
  * 개별 카운터 카드 항목 컴포저블
  *
- * @param project 카드에 표시할 프로젝트 데이터
- * @param onClick 카드 영역 선택 콜백
- * @param onDelete 카드 삭제 클릭 콜백
+ * @param project 표시할 카운터 프로젝트 데이터
+ * @param onClick 카드 영역 클릭 시 실행할 행동
+ * @param onDelete 카드 삭제 클릭 시 실행할 행동
  */
 @Composable
 fun ProjectCardItem(
@@ -120,14 +124,15 @@ fun ProjectCardItem(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                val isProgress = project.status == "진행"
                 Surface(
-                    color = if (project.status == "진행") Color(0xFFFDF0E9) else Color(0xFFE3EAD8),
+                    color = if (isProgress) Color(0xFFFDF0E9) else Color(0xFFE3EAD8),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
                         text = project.status,
                         fontSize = 11.sp,
-                        color = PointOrange,
+                        color = if (isProgress) PointOrange else Color(0xFF4CAF50),
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                     )
@@ -147,10 +152,10 @@ fun ProjectCardItem(
 
             Column {
                 Text(text = project.title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextDark)
-                Text(text = project.info, fontSize = 11.sp, color = Color.Gray)
+                Text(text = project.yarnAndNeedle, fontSize = 11.sp, color = Color.Gray)
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "${project.currentCount} / ${project.targetCount}단",
+                    text = "${project.currentRows} / ${project.totalRows}단",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = PointOrange

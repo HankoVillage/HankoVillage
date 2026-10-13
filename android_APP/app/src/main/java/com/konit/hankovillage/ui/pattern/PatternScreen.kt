@@ -82,7 +82,6 @@
         }
 
         if (selectedPattern != null) {
-            // 상세 화면에서 시스템 뒤로가기 동작 시 목록 화면으로 복귀
             BackHandler {
                 selectedPattern = null
             }

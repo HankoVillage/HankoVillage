@@ -30,6 +30,9 @@ val CardBg = Color(0xFFEFECE1)
 val PointOrange = Color(0xFFD36D33)
 val TextDark = Color(0xFF332D29)
 
+/**
+ * 마이페이지 내 세부 서브 화면 이동을 위한 내비게이션 상태 정의
+ */
 enum class ProfileSubScreen {
     NONE, EDIT_PROFILE, MY_POSTS, LIKED_POSTS, NOTIFICATION_SETTINGS
 }
@@ -60,7 +63,6 @@ fun ProfileScreen(
         )
     }
 
-    // 커뮤니티 게시글(postList)에서 내 글과 좋아요한 글을 동적 필터링
     val myPosts = remember(postList, profile.nickname) {
         postList.filter { it.isMyPost || it.authorName == profile.nickname }
     }
@@ -342,6 +344,14 @@ fun ProfileScreen(
     }
 }
 
+/**
+ * 프로필 메뉴 항목 아이템 컴포저블
+ *
+ * @param icon 메뉴 아이콘
+ * @param title 메뉴 제목
+ * @param titleColor 메뉴 텍스트 색상
+ * @param onClick 메뉴 선택 시 콜백
+ */
 @Composable
 fun ProfileMenuItem(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -366,6 +376,13 @@ fun ProfileMenuItem(
     }
 }
 
+/**
+ * 프로필 수정 화면 컴포저블
+ *
+ * @param profile 기존 프로필 데이터
+ * @param onBack 이전 화면 전환 콜백
+ * @param onSave 수정 데이터 저장 콜백
+ */
 @Composable
 fun EditProfileContent(
     profile: UserProfileData,
@@ -466,6 +483,10 @@ fun EditProfileContent(
 
 /**
  * 작성한 글 / 좋아요한 글의 실제 PostData 목록을 보여주는 컴포저블
+ *
+ * @param title 목록 화면 제목
+ * @param posts 게시글 리스트
+ * @param onBack 뒤로가기 콜백
  */
 @Composable
 fun SimplePostListContent(
@@ -521,6 +542,14 @@ fun SimplePostListContent(
     }
 }
 
+/**
+ * 푸시 알림 수신 여부를 설정하는 화면 컴포저블
+ *
+ * @param profile 사용자 프로필 및 알림 설정 데이터
+ * @param onBack 뒤로가기 콜백
+ * @param onToggleComment 댓글 알림 토글 콜백
+ * @param onToggleLike 좋아요 알림 토글 콜백
+ */
 @Composable
 fun NotificationSettingsContent(
     profile: UserProfileData,
@@ -589,6 +618,12 @@ fun NotificationSettingsContent(
     }
 }
 
+/**
+ * 회원 탈퇴 안내 및 최종 동의를 확인하는 팝업 다이얼로그
+ *
+ * @param onDismiss 다이얼로그 닫기 콜백
+ * @param onConfirmDelete 회원 탈퇴 확정 콜백
+ */
 @Composable
 fun DeleteAccountDialog(
     onDismiss: () -> Unit,
