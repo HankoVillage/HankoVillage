@@ -533,7 +533,7 @@ fun CounterScreen(
                     onClick = {
                         val targetIndex = memoList.indexOfFirst { it.id == editingMemo?.id }
                         if (targetIndex != -1 && editMemoText.isNotBlank()) {
-                            memoList[targetIndex] = memoList[targetIndex].copy(text = editMemoText)
+                            memoList[targetIndex] = memoList[targetIndex].copy(text = editMemoText )
                         }
                         editingMemo = null
                     },
