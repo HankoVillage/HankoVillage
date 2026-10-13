@@ -63,11 +63,15 @@ fun ProfileScreen(
         )
     }
 
-    val myPosts = remember(postList, profile.nickname) {
-        postList.filter { it.isMyPost || it.authorName == profile.nickname }
+    val myPosts by remember {
+        derivedStateOf {
+            postList.filter { it.isMyPost || it.authorName == profile.nickname }
+        }
     }
-    val likedPosts = remember(postList) {
-        postList.filter { it.isLiked }
+    val likedPosts by remember {
+        derivedStateOf {
+            postList.filter { it.isLiked }
+        }
     }
 
     var currentSubScreen by remember { mutableStateOf(ProfileSubScreen.NONE) }
