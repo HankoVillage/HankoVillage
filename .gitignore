@@ -11,3 +11,10 @@ __pycache__/
 
 # 로컬 백업 파일
 *.dump
+
+# 빌드 결과물 (Gradle 등)
+build/
+
+# IDE 설정 (Android Studio · IntelliJ)
+.idea/
+*.iml
