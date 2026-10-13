@@ -5,8 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
@@ -15,10 +15,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.lazy.grid.items
 
 /**
  * 등록된 프로젝트 카운터 목록을 조회하고, 신규 카운터를 추가하거나 선택/삭제하는 화면 컴포저블
@@ -35,8 +33,6 @@ fun ProjectListScreen(
     onDeleteProject: (ProjectData) -> Unit,
     onProjectSelect: (ProjectData) -> Unit
 ) {
-    var showAddDialog by remember { mutableStateOf(false) }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -53,7 +49,20 @@ fun ProjectListScreen(
                 Text(text = "작업할 카드를 선택하세요", fontSize = 13.sp, color = Color.Gray)
             }
             Button(
-                onClick = { showAddDialog = true },
+                onClick = {
+                    // 팝업 다이얼로그 없이 바로 새 빈 프로젝트 객체를 만들어 상세/편집 화면으로 이동
+                    val newProject = ProjectData(
+                        id = System.currentTimeMillis(),
+                        title = "새 프로젝트",
+                        needleType = "대바늘",
+                        info = "실 · 바늘 정보를 입력해 주세요",
+                        currentCount = 0,
+                        targetCount = 100,
+                        status = "진행",
+                        memo = ""
+                    )
+                    onProjectSelect(newProject)
+                },
                 colors = ButtonDefaults.buttonColors(containerColor = PointOrange),
                 shape = RoundedCornerShape(12.dp)
             ) {
@@ -68,7 +77,7 @@ fun ProjectListScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(projectList) { project ->
+            items(projectList, key = { it.id }) { project ->
                 ProjectCardItem(
                     project = project,
                     onClick = { onProjectSelect(project) },
@@ -76,75 +85,6 @@ fun ProjectListScreen(
                 )
             }
         }
-    }
-
-    if (showAddDialog) {
-        var title by remember { mutableStateOf("") }
-        var info by remember { mutableStateOf("") }
-        var needleType by remember { mutableStateOf("") }
-        var current by remember { mutableStateOf("0") }
-        var target by remember { mutableStateOf("100") }
-
-        AlertDialog(
-            onDismissRequest = { showAddDialog = false },
-            title = { Text("새 단수 카운터 추가") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = title,
-                        onValueChange = { title = it },
-                        label = { Text("작품 이름 (예: 가을 머플러)") },
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        value = needleType,
-                        onValueChange = { needleType = it },
-                        label = { Text("바늘 종류 (예: 대바늘 / 코바늘)") },
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        value = info,
-                        onValueChange = { info = it },
-                        label = { Text("실 · 바늘 정보 (예: 울 / 4mm)") },
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        value = current,
-                        onValueChange = { current = it },
-                        label = { Text("시작 단수") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        value = target,
-                        onValueChange = { target = it },
-                        label = { Text("목표 단수") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true
-                    )
-                }
-            },
-            confirmButton = {
-                Button(onClick = {
-                    if (title.isNotEmpty()) {
-                        val newProject = ProjectData(
-                            title = title,
-                            needleType = needleType,
-                            info = if (info.isEmpty()) "정보 없음" else info,
-                            currentCount = current.toIntOrNull() ?: 0,
-                            targetCount = target.toIntOrNull() ?: 100
-                        )
-                        onAddProject(newProject)
-                        showAddDialog = false
-                    }
-                }) {
-                    Text("추가하기")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAddDialog = false }) { Text("취소") }
-            }
-        )
     }
 }
 

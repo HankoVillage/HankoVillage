@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -39,7 +40,9 @@ val AvailableTags = listOf("의류", "목도리", "모자", "가방", "인형", 
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PatternScreen() {
+fun PatternScreen(
+    patternList: SnapshotStateList<PatternData> = remember { mutableStateListOf() }
+) {
     val patternList = remember {
         mutableStateListOf(
             PatternData(

@@ -21,19 +21,21 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.konit.hankovillage.ui.auth.LoginScreen
 import com.konit.hankovillage.ui.auth.UserSession
+import com.konit.hankovillage.ui.community.CommentData
+import com.konit.hankovillage.ui.community.CommunityCategory
 import com.konit.hankovillage.ui.community.CommunityScreen
+import com.konit.hankovillage.ui.community.PostData
 import com.konit.hankovillage.ui.counter.CounterScreen
 import com.konit.hankovillage.ui.counter.ProjectData
 import com.konit.hankovillage.ui.counter.ProjectListScreen
+import com.konit.hankovillage.ui.pattern.PatternData
 import com.konit.hankovillage.ui.pattern.PatternScreen
 import com.konit.hankovillage.ui.profile.ProfileScreen
+import com.konit.hankovillage.ui.yarn.YarnData
 import com.konit.hankovillage.ui.yarn.YarnScreen
 
 /**
  * 하단 네비게이션 바의 탭 메뉴 항목 데이터 모델
- *
- * @property title 탭에 표시될 텍스트
- * @property route 네비게이션 라우팅 경로
  */
 sealed class BottomNavItem(val title: String, val route: String) {
     object Home : BottomNavItem("단수카운터", "home")
@@ -45,7 +47,6 @@ sealed class BottomNavItem(val title: String, val route: String) {
 
 /**
  * 앱의 메인 화면 컴포저블
- *
  * 하단 네비게이션 바 제어, 사용자 로그인 세션 관리 및 비회원 접근 제한 권한을 제어합니다.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -57,6 +58,10 @@ fun MainScreen() {
     var currentUserSession by remember { mutableStateOf<UserSession?>(null) }
     var showLoginAuthDialog by remember { mutableStateOf(false) }
 
+    // =========================================================================
+    // 상태 호이스팅 (State Hoisting)
+    // 탭 전환 시 데이터 손실을 방지하기 위해 MainScreen에서 데이터를 관리합니다.
+    // =========================================================================
     val projectList = remember {
         mutableStateListOf(
             ProjectData(
@@ -67,10 +72,42 @@ fun MainScreen() {
         )
     }
 
+    val yarnList = remember { mutableStateListOf<YarnData>() }
+    val patternList = remember { mutableStateListOf<PatternData>() }
+
+    val postList = remember {
+        mutableStateListOf(
+            PostData(
+                id = 1L,
+                title = "이번에 완성한 대바늘 꽈배기 니트 뽐냅니다!",
+                category = CommunityCategory.SHOWOFF,
+                authorName = currentUserSession?.profile?.nickname ?: "김뜨개",
+                createdAt = "2026-10-10",
+                content = "3주 동안 도안 보면서 열공해서 만들었어요! 생각보다 핏이 너무 예쁘게 나와서 만족스럽습니다.",
+                likeCount = 12,
+                comments = mutableListOf(
+                    CommentData(101L, "뜨개장인", "와 너무 예뻐요! 어떤 실 쓰셨나요?", "2026-10-10 14:20"),
+                    CommentData(102L, currentUserSession?.profile?.nickname ?: "김뜨개", "메리노울 100g 4.0mm 바늘 썼습니다!", "2026-10-10 14:35", isMyComment = true)
+                ),
+                isMyPost = true
+            )gt
+        )
+    }
+
     var selectedProject by rememberSaveable { mutableStateOf<ProjectData?>(null) }
 
     val appBgColor = Color(0xFFF7F4EB)
     val pointOrangeColor = Color(0xFFD36D33)
+
+    // 프로필/로그인 탭으로 이동하는 공통 람다 함수
+    val navigateToProfile = {
+        selectedTab = BottomNavItem.Profile
+        navController.navigate(BottomNavItem.Profile.route) {
+            popUpTo(navController.graph.startDestinationId) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
 
     Scaffold(
         containerColor = appBgColor,
@@ -132,18 +169,18 @@ fun MainScreen() {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(BottomNavItem.Yarn.route) {
-                YarnScreen()
+                YarnScreen(yarnList = yarnList)
             }
 
             composable(BottomNavItem.Pattern.route) {
-                PatternScreen()
+                PatternScreen(patternList = patternList)
             }
 
             composable(BottomNavItem.Home.route) {
                 if (selectedProject == null) {
                     ProjectListScreen(
                         projectList = projectList,
-                        onAddProject = { newProject -> projectList.add(newProject) },
+                        onAddProject = { newProject -> projectList.add(0, newProject) }, // 이 줄을 추가해야 에러가 사라집니다!
                         onDeleteProject = { projectToDelete -> projectList.remove(projectToDelete) },
                         onProjectSelect = { project -> selectedProject = project }
                     )
@@ -154,15 +191,28 @@ fun MainScreen() {
 
                     CounterScreen(
                         project = selectedProject!!,
-                        onBackClick = { selectedProject = null }
+                        onBackClick = { selectedProject = null },
+                        onSaveProject = { savedProject ->
+                            val index = projectList.indexOfFirst { it.id == savedProject.id }
+                            if (index != -1) {
+                                projectList[index] = savedProject
+                            } else {
+                                projectList.add(0, savedProject)
+                            }
+                            selectedProject = null
+                        }
                     )
                 }
             }
 
             composable(BottomNavItem.Community.route) {
                 CommunityScreen(
+                    postList = postList,
                     isLoggedIn = currentUserSession != null,
-                    currentNickname = currentUserSession?.profile?.nickname ?: "익명"
+                    currentNickname = currentUserSession?.profile?.nickname ?: "익명",
+                    onRequireLogin = {
+                        navigateToProfile()
+                    }
                 )
             }
 
@@ -204,12 +254,7 @@ fun MainScreen() {
                 Button(
                     onClick = {
                         showLoginAuthDialog = false
-                        selectedTab = BottomNavItem.Profile
-                        navController.navigate(BottomNavItem.Profile.route) {
-                            popUpTo(navController.graph.startDestinationId) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
+                        navigateToProfile()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = pointOrangeColor)
                 ) {

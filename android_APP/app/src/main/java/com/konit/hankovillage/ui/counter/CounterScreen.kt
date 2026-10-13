@@ -2,6 +2,7 @@ package com.konit.hankovillage.ui.counter
 
 import android.app.Activity
 import android.view.WindowManager
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -24,7 +25,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.activity.compose.BackHandler
 
 val BgColor = Color(0xFFF7F4EB)
 val CardBg = Color(0xFFEFECE1)
@@ -33,10 +33,6 @@ val TextDark = Color(0xFF332D29)
 
 /**
  * 카운터 단수별 메모 항목 데이터 모델
- *
- * @property id 메모 고유 식별자 (기본값: 생성 타임스탬프)
- * @property count 메모가 작성된 시점 단수
- * @property text 메모 내용
  */
 data class MemoItem(
     val id: Long = System.currentTimeMillis(),
@@ -46,14 +42,12 @@ data class MemoItem(
 
 /**
  * 뜨개질 프로젝트의 진행 단수 카운팅 및 메모 관리 화면 컴포저블
- *
- * @property project 현재 진행 중인 프로젝트 데이터 객체
- * @property onBackClick 카운터 목록 화면으로 이동하는 콜백
  */
 @Composable
 fun CounterScreen(
     project: ProjectData,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onSaveProject: (ProjectData) -> Unit = {}
 ) {
     BackHandler {
         onBackClick()
@@ -62,7 +56,7 @@ fun CounterScreen(
     var isKeepScreenOn by remember { mutableStateOf(true) }
     val context = LocalContext.current
 
-    // 뜨개질 진행 중 화면이 꺼지지 않도록 윈도우 플래그 제어
+    // 화면 꺼짐 방지 플래그 제어
     DisposableEffect(isKeepScreenOn) {
         val window = (context as? Activity)?.window
         if (isKeepScreenOn) {
@@ -76,15 +70,17 @@ fun CounterScreen(
         }
     }
 
-    var title by remember { mutableStateOf(project.title) }
-    var info by remember { mutableStateOf(project.info) }
-    var currentCount by remember { mutableStateOf(project.currentCount) }
-    var targetCount by remember { mutableStateOf(project.targetCount) }
+    // 프로젝트 정보 상태 동기화
+    var title by remember(project.id) { mutableStateOf(project.title) }
+    var info by remember(project.id) { mutableStateOf(project.info) }
+    var currentCount by remember(project.id) { mutableIntStateOf(project.currentCount) }
+    var targetCount by remember(project.id) { mutableIntStateOf(project.targetCount) }
 
     val memoList = remember { mutableStateListOf<MemoItem>() }
 
-    LaunchedEffect(Unit) {
-        if (project.memo.isNotBlank() && memoList.isEmpty()) {
+    LaunchedEffect(project.id) {
+        memoList.clear()
+        if (project.memo.isNotBlank()) {
             memoList.add(MemoItem(count = currentCount, text = project.memo))
         }
     }
@@ -113,11 +109,34 @@ fun CounterScreen(
             .verticalScroll(scrollState)
             .imePadding()
     ) {
-        TextButton(onClick = onBackClick) {
-            Text("< 카운터 목록으로", color = PointOrange, fontWeight = FontWeight.Bold)
+        // 상단 바: 취소 및 저장 버튼
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextButton(onClick = onBackClick) {
+                Text("< 취소", color = Color.Gray, fontWeight = FontWeight.Bold)
+            }
+
+            Button(
+                onClick = {
+                    val updatedProject = project.copy(
+                        title = title,
+                        info = info,
+                        currentCount = currentCount,
+                        targetCount = targetCount,
+                        memo = memoList.lastOrNull()?.text ?: project.memo
+                    )
+                    onSaveProject(updatedProject)
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = PointOrange)
+            ) {
+                Text("저장하기", color = Color.White, fontWeight = FontWeight.Bold)
+            }
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -134,6 +153,7 @@ fun CounterScreen(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // 초기화 버튼
                 OutlinedButton(
                     onClick = { showResetDialog = true },
                     modifier = Modifier.height(38.dp),
@@ -161,13 +181,31 @@ fun CounterScreen(
                     }
                 }
 
-                IconButton(onClick = { showEditDialog = true }) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "카운터 정보 수정",
-                        tint = TextDark,
-                        modifier = Modifier.size(18.dp)
+                Card(
+                    onClick = { showEditDialog = true },
+                    modifier = Modifier.height(38.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    border = androidx.compose.foundation.BorderStroke(
+                        width = 1.dp,
+                        color = Color(0xFF625340)
+                    ),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFFEFF7DF)
                     )
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .padding(horizontal = 14.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "수정",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextDark
+                        )
+                    }
                 }
             }
         }
@@ -222,7 +260,6 @@ fun CounterScreen(
                 onClick = {
                     if (currentCount > 0) {
                         currentCount--
-                        project.currentCount = currentCount
                     }
                 },
                 modifier = Modifier.weight(1f).height(60.dp),
@@ -235,7 +272,6 @@ fun CounterScreen(
             Button(
                 onClick = {
                     currentCount++
-                    project.currentCount = currentCount
                 },
                 modifier = Modifier.weight(2f).height(60.dp),
                 shape = RoundedCornerShape(16.dp),
@@ -456,7 +492,6 @@ fun CounterScreen(
                     onClick = {
                         if (newMemoText.isNotBlank()) {
                             memoList.add(MemoItem(count = currentCount, text = newMemoText))
-                            project.memo = newMemoText
                             newMemoText = ""
                         }
                         showMemoDialog = false
@@ -495,7 +530,6 @@ fun CounterScreen(
                         val targetIndex = memoList.indexOfFirst { it.id == editingMemo?.id }
                         if (targetIndex != -1 && editMemoText.isNotBlank()) {
                             memoList[targetIndex] = memoList[targetIndex].copy(text = editMemoText)
-                            project.memo = editMemoText
                         }
                         editingMemo = null
                     },
@@ -521,7 +555,6 @@ fun CounterScreen(
                 Button(
                     onClick = {
                         memoList.remove(memoToDelete)
-                        project.memo = memoList.lastOrNull()?.text ?: ""
                         memoToDelete = null
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
@@ -546,7 +579,6 @@ fun CounterScreen(
                 Button(
                     onClick = {
                         currentCount = 0
-                        project.currentCount = 0
                         showResetDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = PointOrange)
@@ -602,18 +634,13 @@ fun CounterScreen(
                     currentCount = editCurrent.toIntOrNull() ?: currentCount
                     targetCount = editTarget.toIntOrNull() ?: targetCount
 
-                    project.title = title
-                    project.info = info
-                    project.currentCount = currentCount
-                    project.targetCount = targetCount
-
                     showEditDialog = false
                 }) {
                     Text("수정 완료")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showEditDialog = false }) { Text("취소") }
+                TextButton(onClick = { showEditDialog = false }) { Text("취소", color = Color.Gray) }
             }
         )
     }

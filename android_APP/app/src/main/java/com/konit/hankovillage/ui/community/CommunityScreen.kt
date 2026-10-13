@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -29,33 +30,35 @@ val TextDark = Color(0xFF332D29)
 
 /**
  * 커뮤니티 메인 화면 컴포저블
- *
- * @param isLoggedIn 사용자 회원 가입/로그인 상태 여부
- * @param currentNickname 현재 로그인한 유저의 동적 닉네임
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CommunityScreen(
+    postList: SnapshotStateList<PostData> = remember { mutableStateListOf() },
     isLoggedIn: Boolean = true,
-    currentNickname: String = "김뜨개"
+    currentNickname: String = "김뜨개",
+    onRequireLogin: () -> Unit = {}
 ) {
-    val postList = remember {
-        mutableStateListOf(
-            PostData(
-                id = 1L,
-                title = "이번에 완성한 대바늘 꽈배기 니트 뽐냅니다!",
-                category = CommunityCategory.SHOWOFF,
-                authorName = currentNickname,
-                createdAt = "2026-10-10",
-                content = "3주 동안 도안 보면서 열공해서 만들었어요! 생각보다 핏이 너무 예쁘게 나와서 만족스럽습니다.",
-                likeCount = 12,
-                comments = mutableListOf(
-                    CommentData(101L, "뜨개장인", "와 너무 예뻐요! 어떤 실 쓰셨나요?", "2026-10-10 14:20"),
-                    CommentData(102L, currentNickname, "메리노울 100g 4.0mm 바늘 썼습니다!", "2026-10-10 14:35", isMyComment = true)
-                ),
-                isMyPost = true
+    // 초기 더미 데이터 설정 (리스트가 비어있을 때 최초 1회만 초기화)
+    LaunchedEffect(Unit) {
+        if (postList.isEmpty()) {
+            postList.add(
+                PostData(
+                    id = 1L,
+                    title = "이번에 완성한 대바늘 꽈배기 니트 뽐냅니다!",
+                    category = CommunityCategory.SHOWOFF,
+                    authorName = currentNickname,
+                    createdAt = "2026-10-10",
+                    content = "3주 동안 도안 보면서 열공해서 만들었어요! 생각보다 핏이 너무 예쁘게 나와서 만족스럽습니다.",
+                    likeCount = 12,
+                    comments = mutableListOf(
+                        CommentData(101L, "뜨개장인", "와 너무 예뻐요! 어떤 실 쓰셨나요?", "2026-10-10 14:20"),
+                        CommentData(102L, currentNickname, "메리노울 100g 4.0mm 바늘 썼습니다!", "2026-10-10 14:35", isMyComment = true)
+                    ),
+                    isMyPost = true
+                )
             )
-        )
+        }
     }
 
     var selectedCategory by remember { mutableStateOf(CommunityCategory.ALL) }
@@ -212,7 +215,10 @@ fun CommunityScreen(
             text = { Text("커뮤니티 글쓰기, 검색, 댓글 및 좋아요 기능은 회원전용 서비스입니다. 로그인하시겠습니까?") },
             confirmButton = {
                 Button(
-                    onClick = { showAuthDialog = false },
+                    onClick = {
+                        showAuthDialog = false
+                        onRequireLogin()
+                    },
                     colors = ButtonDefaults.buttonColors(containerColor = PointOrange)
                 ) {
                     Text("로그인하러 가기", color = Color.White)
@@ -226,7 +232,7 @@ fun CommunityScreen(
 }
 
 /**
- * 게시글 항목 카드를 표시하는 컴포저블
+ * 게시글 항목 카드 컴포저블
  */
 @Composable
 fun PostCardItem(
@@ -298,7 +304,7 @@ fun PostCardItem(
 }
 
 /**
- * 게시글 상세 내용 및 댓글 영역을 표시하는 컴포저블
+ * 게시글 상세 내용 및 댓글 영역 컴포저블
  */
 @Composable
 fun PostDetailContent(
@@ -320,6 +326,9 @@ fun PostDetailContent(
 
     var isLiked by remember(post.id) { mutableStateOf(post.isLiked) }
     var likeCount by remember(post.id) { mutableIntStateOf(post.likeCount) }
+
+    // [핵심 해결] 댓글 리스트를 Compose가 실시간으로 감지할 수 있도록 StateList 변환
+    val commentsList = remember(post.id) { post.comments.toMutableStateList() }
 
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -429,10 +438,10 @@ fun PostDetailContent(
                     Text("좋아요 ${likeCount}개", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextDark)
                 }
 
-                Divider(color = Color.LightGray)
+                HorizontalDivider(color = Color.LightGray)
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Text("댓글 목록 (${post.comments.size})", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextDark)
+                Text("댓글 목록 (${commentsList.size})", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextDark)
             }
 
             if (!isLoggedIn) {
@@ -440,7 +449,7 @@ fun PostDetailContent(
                     Text("로그인 후 댓글을 확인해 보세요.", color = Color.Gray, fontSize = 13.sp)
                 }
             } else {
-                items(post.comments, key = { it.id }) { comment ->
+                items(commentsList, key = { it.id }) { comment ->
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = CardBg),
@@ -470,7 +479,11 @@ fun PostDetailContent(
                                         singleLine = true
                                     )
                                     TextButton(onClick = {
-                                        comment.content = commentToEditContent
+                                        val index = commentsList.indexOfFirst { it.id == comment.id }
+                                        if (index != -1) {
+                                            commentsList[index] = commentsList[index].copy(content = commentToEditContent)
+                                            post.comments[index].content = commentToEditContent
+                                        }
                                         editingCommentId = null
                                     }) { Text("저장") }
                                 }
@@ -533,18 +546,20 @@ fun PostDetailContent(
                 Button(
                     onClick = {
                         if (newCommentText.isNotBlank()) {
-                            post.comments.add(
-                                CommentData(
-                                    authorName = currentNickname,
-                                    content = newCommentText,
-                                    createdAt = "방금 전",
-                                    isMyComment = true
-                                )
+                            val newComment = CommentData(
+                                id = System.currentTimeMillis(),
+                                authorName = currentNickname,
+                                content = newCommentText,
+                                createdAt = "방금 전",
+                                isMyComment = true
                             )
+                            // [수정 핵심] 댓글 리스트와 원본 객체 모두에 댓글 추가
+                            commentsList.add(newComment)
+                            post.comments.add(newComment)
                             newCommentText = ""
 
                             coroutineScope.launch {
-                                listState.animateScrollToItem(post.comments.size)
+                                listState.animateScrollToItem(commentsList.size)
                             }
                         }
                     },
@@ -585,6 +600,7 @@ fun PostDetailContent(
             confirmButton = {
                 Button(
                     onClick = {
+                        commentsList.removeIf { it.id == commentToDeleteId }
                         post.comments.removeIf { it.id == commentToDeleteId }
                         commentToDeleteId = null
                     },
@@ -599,7 +615,7 @@ fun PostDetailContent(
 }
 
 /**
- * 게시글 작성 및 수정 입력 양식을 보여주는 컴포저블
+ * 게시글 작성 및 수정 입력 양식 컴포저블
  */
 @Composable
 fun PostFormContent(
@@ -636,6 +652,7 @@ fun PostFormContent(
                             category = selectedCategory,
                             content = content
                         ) ?: PostData(
+                            id = System.currentTimeMillis(),
                             title = title,
                             category = selectedCategory,
                             authorName = currentNickname,
@@ -693,7 +710,7 @@ fun PostFormContent(
 }
 
 /**
- * 게시글/댓글 신고 사유 선택 팝업 다이얼로그
+ * 게시글/댓글 신고 사유 선택 다이얼로그
  */
 @Composable
 fun ReportDialog(onDismiss: () -> Unit) {

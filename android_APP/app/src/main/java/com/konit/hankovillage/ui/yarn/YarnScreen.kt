@@ -1,6 +1,7 @@
 package com.konit.hankovillage.ui.yarn
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -14,6 +15,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -31,18 +33,23 @@ val TextDark = Color(0xFF332D29)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun YarnScreen() {
-    val yarnList = remember {
-        mutableStateListOf(
-            YarnData(
-                id = 1L,
-                name = "메리노 울 100",
-                color = "아이보리 / 02번",
-                shop = "바늘이야기",
-                purchaseDate = "2026-09-15",
-                memo = "가을 머플러용으로 3볼 구매. 권장 바늘 4.0mm"
+fun YarnScreen(
+    yarnList: SnapshotStateList<YarnData> = remember { mutableStateListOf() }
+) {
+    // 초기 더미 데이터가 필요하다면 리스트가 비어있을 때 추가
+    LaunchedEffect(Unit) {
+        if (yarnList.isEmpty()) {
+            yarnList.add(
+                YarnData(
+                    id = 1L,
+                    name = "메리노 울 100",
+                    color = "아이보리 / 02번",
+                    shop = "바늘이야기",
+                    purchaseDate = "2026-09-15",
+                    memo = "가을 머플러용으로 3볼 구매. 권장 바늘 4.0mm"
+                )
             )
-        )
+        }
     }
 
     var selectedYarn by remember { mutableStateOf<YarnData?>(null) }
@@ -98,7 +105,7 @@ fun YarnScreen() {
 
                 FloatingActionButton(
                     onClick = {
-                        selectedYarn = YarnData(name = "", color = "")
+                        selectedYarn = YarnData(id = System.currentTimeMillis(), name = "", color = "")
                         isNewYarn = true
                     },
                     containerColor = PointOrange,
@@ -141,9 +148,6 @@ fun YarnScreen() {
 
 /**
  * 실 보관소 그리드 내 개별 실 정보를 표시하는 카드 컴포저블
- *
- * @param yarn 카드에 표시할 실 데이터 객체
- * @param onClick 카드 선택 시 수행할 동작
  */
 @Composable
 fun YarnCardItem(
@@ -203,13 +207,7 @@ fun YarnCardItem(
 }
 
 /**
- * 실의 세부 정보(이름, 색상, 구매 정보, 메모) 수정 및 작성을 처리하는 상세 화면 컴포저블
- *
- * @param yarn 작성/수정할 대상 실 데이터
- * @param isNew 신규 등록 여부 (true인 경우 삭제 버튼 숨김 처리)
- * @param onBackClick 뒤로가기 클릭 콜백
- * @param onSave 데이터 저장 확정 콜백
- * @param onDelete 실 데이터 삭제 확정 콜백
+ * 실의 세부 정보 수정 및 작성을 처리하는 상세 화면 컴포저블
  */
 @Composable
 fun YarnDetailContent(
@@ -360,7 +358,7 @@ fun YarnDetailContent(
                 onClick = { showDeleteDialog = true },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.Red)
+                border = BorderStroke(1.dp, Color.Red)
             ) {
                 Text("실 삭제하기")
             }

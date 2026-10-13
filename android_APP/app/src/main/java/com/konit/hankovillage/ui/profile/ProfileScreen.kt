@@ -23,15 +23,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.konit.hankovillage.ui.community.PostData
 
 val BgColor = Color(0xFFF7F4EB)
 val CardBg = Color(0xFFEFECE1)
 val PointOrange = Color(0xFFD36D33)
 val TextDark = Color(0xFF332D29)
 
-/**
- * 마이페이지 내 세부 서브 화면 이동을 위한 내비게이션 상태 정의
- */
 enum class ProfileSubScreen {
     NONE, EDIT_PROFILE, MY_POSTS, LIKED_POSTS, NOTIFICATION_SETTINGS
 }
@@ -40,6 +38,7 @@ enum class ProfileSubScreen {
  * 마이페이지 메인 화면 컴포저블
  *
  * @param userProfile 사용자 프로필 데이터
+ * @param postList 커뮤니티의 전체 게시글 리스트 (실시간 연동용)
  * @param onUpdateProfile 프로필 정보 수정 완료 시 호출되는 콜백
  * @param onLogout 로그아웃 시 호출되는 콜백
  */
@@ -47,6 +46,7 @@ enum class ProfileSubScreen {
 @Composable
 fun ProfileScreen(
     userProfile: UserProfileData = UserProfileData(),
+    postList: List<PostData> = emptyList(),
     onUpdateProfile: (UserProfileData) -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
@@ -56,23 +56,16 @@ fun ProfileScreen(
 
     val completedWorks = remember {
         listOf(
-            CompletedWork(1L, "가을 체크 머플러"),
-            CompletedWork(2L, "베이지 그래니 스퀘어 가방"),
-            CompletedWork(3L, "파스텔 코튼 수세미")
+            CompletedWork(1L, "가을 체크 머플러")
         )
     }
 
-    val myPosts = remember {
-        mutableStateListOf(
-            "이번에 완성한 대바늘 꽈배기 니트 뽐냅니다!",
-            "동대문 종합시장 실 쇼핑 후기"
-        )
+    // 커뮤니티 게시글(postList)에서 내 글과 좋아요한 글을 동적 필터링
+    val myPosts = remember(postList, profile.nickname) {
+        postList.filter { it.isMyPost || it.authorName == profile.nickname }
     }
-    val likedPosts = remember {
-        mutableStateListOf(
-            "탑다운 코줍기 구멍 안 생기는 꿀팁 공유",
-            "초보자를 위한 코바늘 기호 모음집"
-        )
+    val likedPosts = remember(postList) {
+        postList.filter { it.isLiked }
     }
 
     var currentSubScreen by remember { mutableStateOf(ProfileSubScreen.NONE) }
@@ -274,31 +267,31 @@ fun ProfileScreen(
                     Column {
                         ProfileMenuItem(
                             icon = Icons.Default.Edit,
-                            title = "작성한 글",
+                            title = "작성한 글 (${myPosts.size})",
                             onClick = { currentSubScreen = ProfileSubScreen.MY_POSTS }
                         )
-                        Divider(color = Color.LightGray.copy(alpha = 0.5f))
+                        HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
 
                         ProfileMenuItem(
                             icon = Icons.Default.Favorite,
-                            title = "좋아요한 글",
+                            title = "좋아요한 글 (${likedPosts.size})",
                             onClick = { currentSubScreen = ProfileSubScreen.LIKED_POSTS }
                         )
-                        Divider(color = Color.LightGray.copy(alpha = 0.5f))
+                        HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
 
                         ProfileMenuItem(
                             icon = Icons.Default.Notifications,
                             title = "알림 설정",
                             onClick = { currentSubScreen = ProfileSubScreen.NOTIFICATION_SETTINGS }
                         )
-                        Divider(color = Color.LightGray.copy(alpha = 0.5f))
+                        HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
 
                         ProfileMenuItem(
                             icon = Icons.Default.ExitToApp,
                             title = "로그아웃",
                             onClick = { showLogoutDialog = true }
                         )
-                        Divider(color = Color.LightGray.copy(alpha = 0.5f))
+                        HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
 
                         ProfileMenuItem(
                             icon = Icons.Default.Delete,
@@ -349,14 +342,6 @@ fun ProfileScreen(
     }
 }
 
-/**
- * 프로필 메뉴 항목 아이템 컴포저블
- *
- * @param icon 메뉴 아이콘
- * @param title 메뉴 제목
- * @param titleColor 메뉴 텍스트 색상
- * @param onClick 메뉴 선택 시 콜백
- */
 @Composable
 fun ProfileMenuItem(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -381,13 +366,6 @@ fun ProfileMenuItem(
     }
 }
 
-/**
- * 프로필 수정 화면 컴포저블
- *
- * @param profile 기존 프로필 데이터
- * @param onBack 이전 화면 전환 콜백
- * @param onSave 수정 데이터 저장 콜백
- */
 @Composable
 fun EditProfileContent(
     profile: UserProfileData,
@@ -487,16 +465,12 @@ fun EditProfileContent(
 }
 
 /**
- * 작성한 글 / 좋아요한 글의 목록을 보여주는 컴포저블
- *
- * @param title 목록 화면 제목
- * @param posts 게시글 제목 리스트
- * @param onBack 뒤로가기 콜백
+ * 작성한 글 / 좋아요한 글의 실제 PostData 목록을 보여주는 컴포저블
  */
 @Composable
 fun SimplePostListContent(
     title: String,
-    posts: List<String>,
+    posts: List<PostData>,
     onBack: () -> Unit
 ) {
     Column(
@@ -520,21 +494,26 @@ fun SimplePostListContent(
             }
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(posts) { postTitle ->
+                items(posts, key = { it.id }) { post ->
                     Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { },
+                        modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = CardBg),
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text(
-                            text = postTitle,
-                            modifier = Modifier.padding(14.dp),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = TextDark
-                        )
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Text(
+                                text = post.title,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextDark
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "${post.authorName} · ${post.createdAt}",
+                                fontSize = 11.sp,
+                                color = Color.Gray
+                            )
+                        }
                     }
                 }
             }
@@ -542,14 +521,6 @@ fun SimplePostListContent(
     }
 }
 
-/**
- * 푸시 알림 수신 여부를 설정하는 화면 컴포저블
- *
- * @param profile 사용자 프로필 및 알림 설정 데이터
- * @param onBack 뒤로가기 콜백
- * @param onToggleComment 댓글 알림 토글 콜백
- * @param onToggleLike 좋아요 알림 토글 콜백
- */
 @Composable
 fun NotificationSettingsContent(
     profile: UserProfileData,
@@ -595,7 +566,7 @@ fun NotificationSettingsContent(
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
-                Divider(color = Color.LightGray.copy(alpha = 0.5f))
+                HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Row(
@@ -618,12 +589,6 @@ fun NotificationSettingsContent(
     }
 }
 
-/**
- * 회원 탈퇴 안내 및 최종 동의를 확인하는 팝업 다이얼로그
- *
- * @param onDismiss 다이얼로그 닫기 콜백
- * @param onConfirmDelete 회원 탈퇴 확정 콜백
- */
 @Composable
 fun DeleteAccountDialog(
     onDismiss: () -> Unit,
