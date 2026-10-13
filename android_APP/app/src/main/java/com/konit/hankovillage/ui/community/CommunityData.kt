@@ -4,6 +4,7 @@ enum class CommunityCategory(val label: String) {
     ALL("전체"),
     SHOWOFF("뽐내기"),
     QUESTION("질문"),
+    TIIPS("꿀팁/공유"),
     FREE("자유")
 }
 

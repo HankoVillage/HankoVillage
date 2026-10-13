@@ -90,7 +90,7 @@ fun MainScreen() {
                     CommentData(102L, currentUserSession?.profile?.nickname ?: "김뜨개", "메리노울 100g 4.0mm 바늘 썼습니다!", "2026-10-10 14:35", isMyComment = true)
                 ),
                 isMyPost = true
-            )gt
+            )
         )
     }
 
