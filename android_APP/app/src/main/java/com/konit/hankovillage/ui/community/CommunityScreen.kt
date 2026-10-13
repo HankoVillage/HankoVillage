@@ -327,7 +327,6 @@ fun PostDetailContent(
     var isLiked by remember(post.id) { mutableStateOf(post.isLiked) }
     var likeCount by remember(post.id) { mutableIntStateOf(post.likeCount) }
 
-    // [핵심 해결] 댓글 리스트를 Compose가 실시간으로 감지할 수 있도록 StateList 변환
     val commentsList = remember(post.id) { post.comments.toMutableStateList() }
 
     val listState = rememberLazyListState()
@@ -349,7 +348,8 @@ fun PostDetailContent(
             }
 
             Row {
-                if (post.isMyPost) {
+                // 💡 [수정] 로그인 상태이면서 작성 본인일 때만 수정/삭제 버튼 노출
+                if (isLoggedIn && post.isMyPost) {
                     IconButton(onClick = onEdit) {
                         Icon(Icons.Default.Edit, contentDescription = "수정", tint = TextDark)
                     }
@@ -553,7 +553,6 @@ fun PostDetailContent(
                                 createdAt = "방금 전",
                                 isMyComment = true
                             )
-                            // [수정 핵심] 댓글 리스트와 원본 객체 모두에 댓글 추가
                             commentsList.add(newComment)
                             post.comments.add(newComment)
                             newCommentText = ""

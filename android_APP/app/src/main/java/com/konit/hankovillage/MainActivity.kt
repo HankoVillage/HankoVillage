@@ -22,12 +22,14 @@ class MainActivity : ComponentActivity() {
                     val md = MessageDigest.getInstance("SHA")
                     md.update(signature.toByteArray())
 
-                    // 카카오용 Key Hash
-                    val keyHash = String(Base64.encode(md.digest(), 0))
+                    val digestBytes = md.digest()
+
+                    // 1. 카카오용 Key Hash (Base64 변환)
+                    val keyHash = String(Base64.encode(digestBytes, 0)).trim()
                     Log.d("KEY_HASH", "카카오 키해시: $keyHash")
 
-                    // 구글용 SHA-1
-                    val sha1 = md.digest().joinToString(":") { String.format("%02X", it) }
+                    // 2. 구글용 SHA-1 (16진수 HEX 변환)
+                    val sha1 = digestBytes.joinToString(":") { String.format("%02X", it) }
                     Log.d("KEY_HASH", "구글 SHA1: $sha1")
                 }
             }

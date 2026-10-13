@@ -1,13 +1,19 @@
 package com.konit.hankovillage.ui.counter
 
-// 메모(memo) 속성 추가
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
+
+/**
+ * 단수 카운터 및 프로젝트 관리를 위한 데이터 모델
+ */
+@Parcelize
 data class ProjectData(
-    val id: Long = System.currentTimeMillis(), // 고유 ID
-    var title: String,         // 작품 이름
-    var needleType: String,    // 바늘 종류 (예: 대바늘 / 코바늘)
-    var info: String,          // 실 및 바늘 정보
-    var currentCount: Int,     // 현재 진행 단수
-    var targetCount: Int,      // 목표 단수
-    var status: String = "진행", // 진행 상태
-    var memo: String = ""      // 뜨개 메모
-)
+    val id: Long,               // 프로젝트 고유 ID
+    val title: String,          // 프로젝트 제목
+    val category: String,       // 카테고리
+    val yarnAndNeedle: String,  // 실 및 바늘 정보
+    val currentRows: Int,       // 현재 진행 단수
+    val totalRows: Int,         // 목표 전체 단수
+    val status: String,         // 진행 상태
+    val memo: String            // 메모 내용
+) : Parcelable

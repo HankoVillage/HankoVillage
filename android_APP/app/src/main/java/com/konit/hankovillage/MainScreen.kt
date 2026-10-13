@@ -231,6 +231,7 @@ fun MainScreen() {
                 } else {
                     ProfileScreen(
                         userProfile = currentSession.profile,
+                        postList = postList,
                         onUpdateProfile = { updatedProfile ->
                             currentUserSession = currentUserSession?.copy(profile = updatedProfile)
                         },
