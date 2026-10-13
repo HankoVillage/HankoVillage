@@ -70,7 +70,7 @@ fun ProfileScreen(
     }
     val likedPosts by remember {
         derivedStateOf {
-            postList.filter { it.isLiked }
+            postList.filter { it.isLiked  }
         }
     }
 
