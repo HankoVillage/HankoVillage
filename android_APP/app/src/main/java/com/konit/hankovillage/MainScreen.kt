@@ -1,6 +1,7 @@
 package com.konit.hankovillage
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -130,8 +131,9 @@ fun MainScreen() {
         containerColor = appBgColor,
         bottomBar = {
             NavigationBar(
-                modifier = Modifier.height(90.dp),
-                containerColor = appBgColor
+                modifier = Modifier.fillMaxWidth(),
+                containerColor = appBgColor,
+                windowInsets = NavigationBarDefaults.windowInsets
             ) {
                 val items = listOf(
                     BottomNavItem.Yarn,
