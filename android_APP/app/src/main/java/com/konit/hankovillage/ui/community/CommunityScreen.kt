@@ -571,10 +571,8 @@ fun PostDetailContent(
                             commentsList.add(newComment)
                             post.comments.add(newComment)
                             newCommentText = ""
-
                             coroutineScope.launch {
                                 if (post.comments.isNotEmpty()) {
-                                    // Header(본문) item이 index 0에 있으므로 댓글 개수 위치로 스크롤
                                     listState.animateScrollToItem(post.comments.size)
                                 }
                             }

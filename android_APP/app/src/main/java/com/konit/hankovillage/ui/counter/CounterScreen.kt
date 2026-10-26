@@ -5,6 +5,8 @@ import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -13,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,35 +28,23 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.konit.hankovillage.ui.yarn.YarnData
 
 private val BgColor = Color(0xFFF7F4EB)
 private val CardBg = Color(0xFFEFECE1)
 private val TextDark = Color(0xFF332D29)
 private val PointOrange = Color(0xFFD36D33)
 
-/**
- * 카운터 단수별 메모 항목 데이터 모델
- *
- * @property id 메모 고유 식별자 (기본값: 생성 타임스탬프)
- * @property count 메모가 작성된 시점의 단수
- * @property text 메모 내용
- */
 data class MemoItem(
     val id: Long = System.currentTimeMillis(),
     val count: Int,
     var text: String
 )
 
-/**
- * 뜨개질 프로젝트의 진행 단수 카운팅 및 메모 관리를 담당하는 화면 컴포저블
- *
- * @param project 현재 카운팅 중인 프로젝트 데이터 객체
- * @param onBackClick 뒤로가기 클릭 이벤트 콜백
- * @param onSaveProject 수정 및 카운팅된 프로젝트 저장 콜백
- */
 @Composable
 fun CounterScreen(
     project: ProjectData,
+    yarnList: List<YarnData> = emptyList(), // 실 보관소 연동 리스트
     onBackClick: () -> Unit,
     onSaveProject: (ProjectData) -> Unit = {}
 ) {
@@ -64,7 +55,6 @@ fun CounterScreen(
     var isKeepScreenOn by remember { mutableStateOf(true) }
     val context = LocalContext.current
 
-    // 뜨개질 진행 중 화면이 꺼지지 않도록 윈도우 플래그 제어
     DisposableEffect(isKeepScreenOn) {
         val window = (context as? Activity)?.window
         if (isKeepScreenOn) {
@@ -82,6 +72,7 @@ fun CounterScreen(
     var yarnAndNeedle by remember(project.id) { mutableStateOf(project.yarnAndNeedle) }
     var currentRows by remember(project.id) { mutableIntStateOf(project.currentRows) }
     var totalRows by remember(project.id) { mutableIntStateOf(project.totalRows) }
+    var status by remember(project.id) { mutableStateOf(project.status) } // 진행 / 완료
     val memoList = remember { mutableStateListOf<MemoItem>() }
 
     LaunchedEffect(project.id) {
@@ -89,6 +80,25 @@ fun CounterScreen(
         if (project.memo.isNotBlank()) {
             memoList.add(MemoItem(count = currentRows, text = project.memo))
         }
+    }
+
+    // 💡 변경된 프로젝트 데이터 저장 함수
+    fun saveCurrentProjectState(
+        updatedRows: Int = currentRows,
+        updatedTitle: String = title,
+        updatedYarnAndNeedle: String = yarnAndNeedle,
+        updatedTotalRows: Int = totalRows,
+        updatedStatus: String = status
+    ) {
+        val updatedProject = project.copy(
+            title = updatedTitle,
+            yarnAndNeedle = updatedYarnAndNeedle,
+            currentRows = updatedRows,
+            totalRows = updatedTotalRows,
+            status = updatedStatus,
+            memo = memoList.lastOrNull()?.text ?: project.memo
+        )
+        onSaveProject(updatedProject)
     }
 
     var showMemoDialog by remember { mutableStateOf(false) }
@@ -115,29 +125,14 @@ fun CounterScreen(
             .verticalScroll(scrollState)
             .imePadding()
     ) {
+        // 상단 바 (저장하기 버튼 제거 -> < 목록으로 만 남김)
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.Start,
             verticalAlignment = Alignment.CenterVertically
         ) {
             TextButton(onClick = onBackClick) {
-                Text("< 취소", color = Color.Gray, fontWeight = FontWeight.Bold)
-            }
-
-            Button(
-                onClick = {
-                    val updatedProject = project.copy(
-                        title = title,
-                        yarnAndNeedle = yarnAndNeedle,
-                        currentRows = currentRows,
-                        totalRows = totalRows,
-                        memo = memoList.lastOrNull()?.text ?: project.memo
-                    )
-                    onSaveProject(updatedProject)
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = PointOrange)
-            ) {
-                Text("저장하기", color = Color.White, fontWeight = FontWeight.Bold)
+                Text("< 목록으로", color = PointOrange, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
         }
 
@@ -149,7 +144,7 @@ fun CounterScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = "진행 중인 작업", fontSize = 12.sp, color = PointOrange, fontWeight = FontWeight.Bold)
+                Text(text = "작업 상태: $status", fontSize = 12.sp, color = PointOrange, fontWeight = FontWeight.Bold)
                 Text(text = title, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextDark)
                 Text(text = yarnAndNeedle, fontSize = 13.sp, color = Color.Gray)
             }
@@ -256,6 +251,7 @@ fun CounterScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // 단수 조정 버튼 (+, - 누를 때 바로 즉시 자동 저장)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -264,6 +260,7 @@ fun CounterScreen(
                 onClick = {
                     if (currentRows > 0) {
                         currentRows--
+                        saveCurrentProjectState(updatedRows = currentRows)
                     }
                 },
                 modifier = Modifier.weight(1f).height(60.dp),
@@ -276,6 +273,7 @@ fun CounterScreen(
             Button(
                 onClick = {
                     currentRows++
+                    saveCurrentProjectState(updatedRows = currentRows)
                 },
                 modifier = Modifier.weight(2f).height(60.dp),
                 shape = RoundedCornerShape(16.dp),
@@ -478,6 +476,7 @@ fun CounterScreen(
         }
     }
 
+    // 메모 추가 다이얼로그 (저장 시 자동 상태 저장)
     if (showMemoDialog) {
         AlertDialog(
             onDismissRequest = { showMemoDialog = false },
@@ -496,6 +495,7 @@ fun CounterScreen(
                     onClick = {
                         if (newMemoText.isNotBlank()) {
                             memoList.add(MemoItem(count = currentRows, text = newMemoText))
+                            saveCurrentProjectState()
                             newMemoText = ""
                         }
                         showMemoDialog = false
@@ -516,6 +516,7 @@ fun CounterScreen(
         )
     }
 
+    // 메모 수정 다이얼로그
     if (editingMemo != null) {
         AlertDialog(
             onDismissRequest = { editingMemo = null },
@@ -533,7 +534,8 @@ fun CounterScreen(
                     onClick = {
                         val targetIndex = memoList.indexOfFirst { it.id == editingMemo?.id }
                         if (targetIndex != -1 && editMemoText.isNotBlank()) {
-                            memoList[targetIndex] = memoList[targetIndex].copy(text = editMemoText )
+                            memoList[targetIndex] = memoList[targetIndex].copy(text = editMemoText)
+                            saveCurrentProjectState()
                         }
                         editingMemo = null
                     },
@@ -550,6 +552,7 @@ fun CounterScreen(
         )
     }
 
+    // 메모 삭제 다이얼로그
     if (memoToDelete != null) {
         AlertDialog(
             onDismissRequest = { memoToDelete = null },
@@ -559,6 +562,7 @@ fun CounterScreen(
                 Button(
                     onClick = {
                         memoList.remove(memoToDelete)
+                        saveCurrentProjectState()
                         memoToDelete = null
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
@@ -574,6 +578,7 @@ fun CounterScreen(
         )
     }
 
+    // 단수 초기화 다이얼로그
     if (showResetDialog) {
         AlertDialog(
             onDismissRequest = { showResetDialog = false },
@@ -583,6 +588,7 @@ fun CounterScreen(
                 Button(
                     onClick = {
                         currentRows = 0
+                        saveCurrentProjectState(updatedRows = 0)
                         showResetDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = PointOrange)
@@ -596,55 +602,105 @@ fun CounterScreen(
         )
     }
 
+    // 정보 수정 다이얼로그 (실 보관소 연동 + 진행 상황 수정 추가)
     if (showEditDialog) {
         var editTitle by remember { mutableStateOf(title) }
         var editYarnAndNeedle by remember { mutableStateOf(yarnAndNeedle) }
         var editCurrent by remember { mutableStateOf(currentRows.toString()) }
         var editTarget by remember { mutableStateOf(totalRows.toString()) }
+        var editStatus by remember { mutableStateOf(status) }
+
+        var showYarnSelectDialog by remember { mutableStateOf(false) }
 
         AlertDialog(
             onDismissRequest = { showEditDialog = false },
-            title = { Text("카운터 정보 수정") },
+            title = { Text("카운터 정보 수정", fontWeight = FontWeight.Bold) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("진행 상황", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = editStatus == "진행",
+                            onClick = { editStatus = "진행" },
+                            label = { Text("진행 중") },
+                            colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PointOrange, selectedLabelColor = Color.White)
+                        )
+                        FilterChip(
+                            selected = editStatus == "완료",
+                            onClick = { editStatus = "완료" },
+                            label = { Text("완료") },
+                            colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PointOrange, selectedLabelColor = Color.White)
+                        )
+                    }
+
                     OutlinedTextField(
                         value = editTitle,
                         onValueChange = { editTitle = it },
                         label = { Text("작품 이름") },
-                        singleLine = true
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
                     )
-                    OutlinedTextField(
-                        value = editYarnAndNeedle,
-                        onValueChange = { editYarnAndNeedle = it },
-                        label = { Text("실 · 바늘 정보") },
-                        singleLine = true
-                    )
+
+                    Column {
+                        OutlinedTextField(
+                            value = editYarnAndNeedle,
+                            onValueChange = { editYarnAndNeedle = it },
+                            label = { Text("실 · 바늘 정보") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        OutlinedButton(
+                            onClick = { showYarnSelectDialog = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(Icons.Default.ShoppingBag, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("🧶 실 보관소에서 불러오기", fontSize = 12.sp, color = PointOrange)
+                        }
+                    }
+
                     OutlinedTextField(
                         value = editCurrent,
                         onValueChange = { editCurrent = it },
                         label = { Text("현재 단수") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
                         value = editTarget,
                         onValueChange = { editTarget = it },
                         label = { Text("목표 단수") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             },
             confirmButton = {
-                Button(onClick = {
-                    title = editTitle
-                    yarnAndNeedle = editYarnAndNeedle
-                    currentRows = editCurrent.toIntOrNull() ?: currentRows
-                    totalRows = editTarget.toIntOrNull() ?: totalRows
+                Button(
+                    onClick = {
+                        title = editTitle
+                        yarnAndNeedle = editYarnAndNeedle
+                        currentRows = editCurrent.toIntOrNull() ?: currentRows
+                        totalRows = editTarget.toIntOrNull() ?: totalRows
+                        status = editStatus
 
-                    showEditDialog = false
-                }) {
-                    Text("수정 완료")
+                        saveCurrentProjectState(
+                            updatedTitle = title,
+                            updatedYarnAndNeedle = yarnAndNeedle,
+                            updatedRows = currentRows,
+                            updatedTotalRows = totalRows,
+                            updatedStatus = status
+                        )
+
+                        showEditDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PointOrange)
+                ) {
+                    Text("수정 완료", color = Color.White)
                 }
             },
             dismissButton = {
@@ -653,5 +709,48 @@ fun CounterScreen(
                 }
             }
         )
+
+        // 실 보관소 선택 다이얼로그
+
+        if (showYarnSelectDialog) {
+            AlertDialog(
+                onDismissRequest = { showYarnSelectDialog = false },
+                title = { Text("실 선택", fontWeight = FontWeight.Bold) },
+                text = {
+                    if (yarnList.isEmpty()) {
+                        Text("실 보관소에 등록된 실이 없습니다.\n'실 보관소' 탭에서 실을 먼저 등록해 보세요.", fontSize = 13.sp, color = Color.Gray)
+                    } else {
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.heightIn(max = 250.dp)
+                        ) {
+                            items(yarnList) { yarn ->
+                                Card(
+                                    onClick = {
+                                        // YarnData의 필드명에 맞추어 실 이름과 정보 자동 완성
+                                        editYarnAndNeedle = yarn.name
+                                        showYarnSelectDialog = false
+                                    },
+                                    colors = CardDefaults.cardColors(containerColor = CardBg),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Text(yarn.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextDark)
+                                        if (yarn.color.isNotBlank()) {
+                                            Text(yarn.color, fontSize = 11.sp, color = Color.Gray)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showYarnSelectDialog = false }) {
+                        Text("닫기", color = Color.Gray)
+                    }
+                }
+            )
+        }
     }
 }

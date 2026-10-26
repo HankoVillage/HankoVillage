@@ -2,7 +2,6 @@ package com.konit.hankovillage
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.List
@@ -62,11 +61,11 @@ sealed class BottomNavItem(val title: String, val route: String) {
 @Composable
 fun MainScreen() {
     val navController = rememberNavController()
-    var selectedTab by remember { mutableStateOf<BottomNavItem>(BottomNavItem.Home) }
     var currentUserSession by remember { mutableStateOf<UserSession?>(null) }
     var showLoginAuthDialog by remember { mutableStateOf(false) }
+
     val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route
+    val currentRoute = navBackStackEntry?.destination?.route ?: BottomNavItem.Home.route
 
     val projectList = remember {
         mutableStateListOf(
@@ -119,7 +118,6 @@ fun MainScreen() {
     val pointOrangeColor = Color(0xFFD36D33)
 
     val navigateToProfile = {
-        selectedTab = BottomNavItem.Profile
         navController.navigate(BottomNavItem.Profile.route) {
             popUpTo(navController.graph.startDestinationId) { saveState = true }
             launchSingleTop = true
@@ -208,6 +206,7 @@ fun MainScreen() {
                     }
                     CounterScreen(
                         project = selectedProject!!,
+                        yarnList = yarnList,
                         onBackClick = { selectedProject = null },
                         onSaveProject = { savedProject ->
                             val index = projectList.indexOfFirst { it.id == savedProject.id }
@@ -216,7 +215,7 @@ fun MainScreen() {
                             } else {
                                 projectList.add(0, savedProject)
                             }
-                            selectedProject = null
+                            selectedProject = savedProject
                         }
                     )
                 }
@@ -241,7 +240,6 @@ fun MainScreen() {
                             currentUserSession = session
                         },
                         onGuestMode = {
-                            selectedTab = BottomNavItem.Home
                             navController.navigate(BottomNavItem.Home.route)
                         }
                     )
@@ -254,7 +252,6 @@ fun MainScreen() {
                         },
                         onLogout = {
                             currentUserSession = null
-                            selectedTab = BottomNavItem.Home
                             navController.navigate(BottomNavItem.Home.route)
                         }
                     )
