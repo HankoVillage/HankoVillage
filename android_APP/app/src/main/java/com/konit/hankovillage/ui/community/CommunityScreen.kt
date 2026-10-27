@@ -493,14 +493,17 @@ fun PostDetailContent(
                                         modifier = Modifier.weight(1f),
                                         singleLine = true
                                     )
-                                    TextButton(onClick = {
-                                        val index = commentsList.indexOfFirst { it.id == comment.id }
-                                        if (index != -1) {
-                                            commentsList[index] = commentsList[index].copy(content = commentToEditContent)
-                                            post.comments[index].content = commentToEditContent
-                                        }
-                                        editingCommentId = null
-                                    }) { Text("저장") }
+                                    TextButton(
+                                        onClick = {
+                                            if (commentToEditContent.isNotBlank()) {
+                                                comment.content = commentToEditContent.trim()
+                                                editingCommentId = null
+                                            }
+                                        },
+                                        enabled = commentToEditContent.isNotBlank()
+                                    ) {
+                                        Text("저장", color = if (commentToEditContent.isNotBlank()) PointOrange else Color.Gray)
+                                    }
                                 }
                             } else {
                                 Text(comment.content, fontSize = 13.sp, color = TextDark)
