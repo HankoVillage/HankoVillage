@@ -2,6 +2,7 @@ package com.konit.hankovillage.ui.pattern
 
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -58,7 +59,6 @@ fun PatternScreen(
             )
         }
     }
-
 
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedStatusFilter by rememberSaveable { mutableStateOf<PatternStatus?>(null) }
@@ -229,9 +229,6 @@ fun PatternScreen(
 
 /**
  * 그리드 목록 내 개별 도안 정보를 카드 형태로 보여주는 컴포저블
- *
- * @param pattern 표시할 도안 데이터
- * @param onClick 카드 선택 시 수행할 행동
  */
 @Composable
 fun PatternCardItem(
@@ -309,11 +306,6 @@ fun PatternCardItem(
 
 /**
  * 선택된 도안의 세부 정보를 표시하고 수정/삭제 및 외부 링크 이동을 제공하는 상세 화면
- *
- * @param pattern 상세 정보를 출력할 도안 객체
- * @param onBackClick 뒤로가기 버튼 클릭 콜백
- * @param onUpdate 도안 정보 업데이트 발생 시 콜백
- * @param onDelete 도안 삭제 요청 시 콜백
  */
 @Composable
 fun PatternDetailContent(
@@ -428,34 +420,29 @@ fun PatternDetailContent(
         Spacer(modifier = Modifier.height(16.dp))
 
         if (pattern.patternUrl.isNotBlank()) {
-            Button(
-                onClick = {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(pattern.patternUrl))
-                    context.startActivity(intent)
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = PointOrange),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Link,
-                    contentDescription = null,
-                    tint = Color.White
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("도안 링크 열기", color = Color.White, fontWeight = FontWeight.Bold)
-            }
-        } else {
             OutlinedButton(
-                onClick = { showEditDialog = true },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(12.dp)
+                onClick = {
+                    try {
+                        val rawUrl = pattern.patternUrl.trim()
+                        // http:// 또는 https:// 스킴 자동 보정
+                        val formattedUrl = if (!rawUrl.startsWith("http://") && !rawUrl.startsWith("https://")) {
+                            "https://$rawUrl"
+                        } else {
+                            rawUrl
+                        }
+
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(formattedUrl))
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        // ActivityNotFoundException 발생 시 크래시 방지 및 Toast 표시
+                        Toast.makeText(context, "링크를 열 수 없어요. 유효한 웹주소인지 확인해 주세요.", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text("도안 링크 등록하기", color = Color.Gray)
+                Icon(Icons.Default.Link, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("🔗 도안 링크 바로가기")
             }
         }
 
@@ -497,10 +484,7 @@ fun PatternDetailContent(
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
-                    Text(
-                        "취소",
-                        color = Color.Gray
-                    )
+                    Text("취소", color = Color.Gray)
                 }
             }
         )
@@ -509,9 +493,6 @@ fun PatternDetailContent(
 
 /**
  * 신규 도안 등록을 위한 모달 다이얼로그
- *
- * @param onDismiss 다이얼로그 닫기 콜백
- * @param onConfirm 도안 생성 확정 시 콜백
  */
 @Composable
 fun PatternUploadDialog(
@@ -583,13 +564,22 @@ fun PatternUploadDialog(
             Button(
                 onClick = {
                     if (title.isNotBlank()) {
+                        val trimmedLink = patternUrl.trim()
+                        val formattedLink = if (trimmedLink.isNotBlank() &&
+                            !trimmedLink.startsWith("http://") &&
+                            !trimmedLink.startsWith("https://")) {
+                            "https://$trimmedLink"
+                        } else {
+                            trimmedLink
+                        }
+
                         onConfirm(
                             PatternData(
                                 title = title,
                                 tag = selectedTag,
                                 yarnInfo = yarnInfo,
                                 needleInfo = needleInfo,
-                                patternUrl = patternUrl
+                                patternUrl = formattedLink
                             )
                         )
                     }
@@ -607,10 +597,6 @@ fun PatternUploadDialog(
 
 /**
  * 기존 도안 정보의 수정을 처리하는 모달 다이얼로그
- *
- * @param pattern 수정할 대상 도안 객체
- * @param onDismiss 다이얼로그 닫기 콜백
- * @param onConfirm 수정 사항 적용 확정 콜백
  */
 @Composable
 fun PatternEditDialog(
@@ -682,13 +668,22 @@ fun PatternEditDialog(
             Button(
                 onClick = {
                     if (title.isNotBlank()) {
+                        val trimmedLink = patternUrl.trim()
+                        val formattedLink = if (trimmedLink.isNotBlank() &&
+                            !trimmedLink.startsWith("http://") &&
+                            !trimmedLink.startsWith("https://")) {
+                            "https://$trimmedLink"
+                        } else {
+                            trimmedLink
+                        }
+
                         onConfirm(
                             pattern.copy(
                                 title = title,
                                 tag = selectedTag,
                                 yarnInfo = yarnInfo,
                                 needleInfo = needleInfo,
-                                patternUrl = patternUrl
+                                patternUrl = formattedLink
                             )
                         )
                     }
