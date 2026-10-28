@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "946892106477",
+    "project_id": "hankovillage",
+    "storage_bucket": "hankovillage.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:946892106477:android:33d1ac0fda76f22f96bae4",
+        "android_client_info": {
+          "package_name": "com.konit.hankovillage"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "946892106477-2vl9i8sd4nfjv2ish2dvb3his9epr9is.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBj1swBeGRrT__Vwla1NqLPR9y4bgDX38I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "946892106477-2vl9i8sd4nfjv2ish2dvb3his9epr9is.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

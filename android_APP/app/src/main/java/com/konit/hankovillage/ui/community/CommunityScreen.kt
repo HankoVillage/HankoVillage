@@ -31,7 +31,7 @@ val TextDark = Color(0xFF332D29)
 /**
  * 커뮤니티 메인 화면 컴포저블
  *
- * @param postList 전체 커뮤니티 게시글 목록 데이터 (StateList)
+ * @param postList 전체 커뮤니티 게시글 목록 데이터 (MainScreen에서 호이스팅되어 전달받음)
  * @param isLoggedIn 사용자 로그인 상태 여부
  * @param currentNickname 현재 로그인한 사용자의 닉네임
  * @param onRequireLogin 비회원 기능 제한 시 로그인 화면으로 이동하는 콜백
@@ -44,26 +44,6 @@ fun CommunityScreen(
     currentNickname: String = "김뜨개",
     onRequireLogin: () -> Unit = {}
 ) {
-    LaunchedEffect(Unit) {
-        if (postList.isEmpty()) {
-            postList.add(
-                PostData(
-                    id = 1L,
-                    title = "이번에 완성한 대바늘 꽈배기 니트 뽐냅니다!",
-                    category = CommunityCategory.SHOWOFF,
-                    authorName = currentNickname,
-                    createdAt = "2026-10-10",
-                    content = "3주 동안 도안 보면서 열공해서 만들었어요! 생각보다 핏이 너무 예쁘게 나와서 만족스럽습니다.",
-                    likeCount = 12,
-                    comments = mutableListOf(
-                        CommentData(101L, "뜨개장인", "와 너무 예뻐요! 어떤 실 쓰셨나요?", "2026-10-10 14:20"),
-                        CommentData(102L, currentNickname, "메리노울 100g 4.0mm 바늘 썼습니다!", "2026-10-10 14:35", isMyComment = true)
-                    ),
-                    isMyPost = true
-                )
-            )
-        }
-    }
 
     var selectedCategory by remember { mutableStateOf(CommunityCategory.ALL) }
     var searchQuery by remember { mutableStateOf("") }
@@ -237,9 +217,6 @@ fun CommunityScreen(
 
 /**
  * 게시글 목록 아이템 카드를 표시하는 컴포저블
- *
- * @param post 카드에 표시할 게시글 데이터
- * @param onClick 게시글 카드 선택 시 실행할 콜백
  */
 @Composable
 fun PostCardItem(
@@ -312,14 +289,6 @@ fun PostCardItem(
 
 /**
  * 게시글 상세 내용 조회 및 댓글 관리를 제공하는 화면 컴포저블
- *
- * @param post 상세 조회할 게시글 데이터
- * @param isLoggedIn 회원 로그인 여부
- * @param currentNickname 현재 로그인 사용자의 닉네임
- * @param onBack 목록 화면 복귀 콜백
- * @param onEdit 게시글 수정 모드 전환 콜백
- * @param onDelete 게시글 삭제 처리 콜백
- * @param onRequireAuth 회원 전용 기능 동작 시 로그인 안내 콜백
  */
 @Composable
 fun PostDetailContent(
@@ -634,11 +603,6 @@ fun PostDetailContent(
 
 /**
  * 게시글 신규 등록 및 수정을 위한 입력 양식 컴포저블
- *
- * @param initialPost 수정 시 전달할 기존 게시글 객체 (신규 생성 시 null)
- * @param currentNickname 현재 로그인 사용자의 닉네임
- * @param onBack 화면 이탈 콜백
- * @param onSave 게시글 작성/수정 저장 콜백
  */
 @Composable
 fun PostFormContent(
@@ -734,8 +698,6 @@ fun PostFormContent(
 
 /**
  * 게시글 및 댓글 신고 사유 선택 다이얼로그
- *
- * @param onDismiss 다이얼로그 닫기 콜백
  */
 @Composable
 fun ReportDialog(onDismiss: () -> Unit) {
