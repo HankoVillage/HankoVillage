@@ -1,4 +1,4 @@
-from sqlalchemy import ForeignKey, String, text
+from sqlalchemy import ForeignKey, String, text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -6,6 +6,7 @@ from app.models.base import Base
 
 class PostImage(Base):
     __tablename__ = "post_images"
+    __table_args__ = (UniqueConstraint("post_id", "sort_order"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     post_id: Mapped[int] = mapped_column(
