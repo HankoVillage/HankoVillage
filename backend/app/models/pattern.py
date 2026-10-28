@@ -29,6 +29,7 @@ class Pattern(Base):
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     title: Mapped[str] = mapped_column(String(50))
+    needle_info: Mapped[str | None] = mapped_column(String(50))
     tag: Mapped[str] = mapped_column(String(10))
     status: Mapped[str] = mapped_column(String(15), server_default=text("'planned'"))
     description: Mapped[str | None] = mapped_column(Text)
