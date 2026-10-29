@@ -24,11 +24,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.konit.hankovillage.ui.community.PostData
-
-val BgColor = Color(0xFFF7F4EB)
-val CardBg = Color(0xFFEFECE1)
-val PointOrange = Color(0xFFD36D33)
-val TextDark = Color(0xFF332D29)
+import com.konit.hankovillage.ui.theme.AppBgColor
+import com.konit.hankovillage.ui.theme.BgColor
+import com.konit.hankovillage.ui.theme.CardBg
+import com.konit.hankovillage.ui.theme.PointOrange
+import com.konit.hankovillage.ui.theme.TextDark
 
 /**
  * 마이페이지 내 세부 서브 화면 이동을 위한 내비게이션 상태 정의

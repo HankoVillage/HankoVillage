@@ -29,11 +29,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.konit.hankovillage.ui.yarn.YarnData
-
-private val BgColor = Color(0xFFF7F4EB)
-private val CardBg = Color(0xFFEFECE1)
-private val TextDark = Color(0xFF332D29)
-private val PointOrange = Color(0xFFD36D33)
+import com.konit.hankovillage.ui.theme.AppBgColor
+import com.konit.hankovillage.ui.theme.BgColor
+import com.konit.hankovillage.ui.theme.CardBg
+import com.konit.hankovillage.ui.theme.PointOrange
+import com.konit.hankovillage.ui.theme.TextDark
 
 data class MemoItem(
     val id: Long = System.currentTimeMillis(),

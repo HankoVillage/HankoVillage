@@ -16,15 +16,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.konit.hankovillage.ui.profile.UserProfileData
+import com.konit.hankovillage.ui.theme.BgColor
+import com.konit.hankovillage.ui.theme.GoogleBg
+import com.konit.hankovillage.ui.theme.GoogleBorder
+import com.konit.hankovillage.ui.theme.KakaoText
+import com.konit.hankovillage.ui.theme.KakaoYellow
+import com.konit.hankovillage.ui.theme.PointOrange
+import com.konit.hankovillage.ui.theme.TextDark
 
-val BgColor = Color(0xFFF7F4EB)
-val PointOrange = Color(0xFFD36D33)
-val TextDark = Color(0xFF332D29)
-
-val KakaoYellow = Color(0xFFFEE500)
-val KakaoText = Color(0xFF191919)
-val GoogleBg = Color(0xFFFFFFFF)
-val GoogleBorder = Color(0xFFDADCE0)
 
 /**
  * 소셜 로그인 및 둘러보기 선택을 제공하는 화면 컴포저블
