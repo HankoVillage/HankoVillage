@@ -23,8 +23,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
 import com.konit.hankovillage.ui.community.PostData
-import com.konit.hankovillage.ui.theme.AppBgColor
 import com.konit.hankovillage.ui.theme.BgColor
 import com.konit.hankovillage.ui.theme.CardBg
 import com.konit.hankovillage.ui.theme.PointOrange
@@ -36,14 +36,8 @@ import com.konit.hankovillage.ui.theme.TextDark
 enum class ProfileSubScreen {
     NONE, EDIT_PROFILE, MY_POSTS, LIKED_POSTS, NOTIFICATION_SETTINGS
 }
-
 /**
  * 마이페이지 메인 화면 컴포저블
- *
- * @param userProfile 사용자 프로필 데이터
- * @param postList 커뮤니티의 전체 게시글 리스트 (실시간 연동용)
- * @param onUpdateProfile 프로필 정보 수정 완료 시 호출되는 콜백
- * @param onLogout 로그아웃 시 호출되는 콜백
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,15 +57,12 @@ fun ProfileScreen(
         )
     }
 
-    val myPosts by remember {
-        derivedStateOf {
-            postList.filter { it.isMyPost || it.authorName == profile.nickname }
-        }
+    val myPosts = remember(postList, profile.nickname) {
+        postList.filter { it.isMyPost || it.authorName == profile.nickname }
     }
-    val likedPosts by remember {
-        derivedStateOf {
-            postList.filter { it.isLiked  }
-        }
+
+    val likedPosts = remember(postList) {
+        postList.filter { it.isLiked }
     }
 
     var currentSubScreen by remember { mutableStateOf(ProfileSubScreen.NONE) }
@@ -88,7 +79,22 @@ fun ProfileScreen(
                 profile = profile,
                 onBack = { currentSubScreen = ProfileSubScreen.NONE },
                 onSave = { updatedProfile ->
+                    val oldNickname = profile.nickname
                     profile = updatedProfile
+                    if (oldNickname != updatedProfile.nickname) {
+                        if (postList is androidx.compose.runtime.snapshots.SnapshotStateList) {
+                            postList.indices.forEach { index ->
+                                if (postList[index].isMyPost) {
+                                    postList[index] = postList[index].copy(authorName = updatedProfile.nickname)
+                                }
+                            }
+                        } else {
+                            postList.filter { it.isMyPost }.forEach { post ->
+                                // 만약 별도의 가변 처리가 되어있지 않다면 isMyPost 기반 필터링만으로도 마이페이지에는 잘 노출됩니다.
+                            }
+                        }
+                    }
+
                     onUpdateProfile(updatedProfile)
                     Toast.makeText(context, "프로필이 수정되었습니다.", Toast.LENGTH_SHORT).show()
                     currentSubScreen = ProfileSubScreen.NONE
@@ -350,11 +356,6 @@ fun ProfileScreen(
 
 /**
  * 프로필 메뉴 항목 아이템 컴포저블
- *
- * @param icon 메뉴 아이콘
- * @param title 메뉴 제목
- * @param titleColor 메뉴 텍스트 색상
- * @param onClick 메뉴 선택 시 콜백
  */
 @Composable
 fun ProfileMenuItem(
@@ -382,10 +383,6 @@ fun ProfileMenuItem(
 
 /**
  * 프로필 수정 화면 컴포저블
- *
- * @param profile 기존 프로필 데이터
- * @param onBack 이전 화면 전환 콜백
- * @param onSave 수정 데이터 저장 콜백
  */
 @Composable
 fun EditProfileContent(
@@ -487,10 +484,6 @@ fun EditProfileContent(
 
 /**
  * 작성한 글 / 좋아요한 글의 실제 PostData 목록을 보여주는 컴포저블
- *
- * @param title 목록 화면 제목
- * @param posts 게시글 리스트
- * @param onBack 뒤로가기 콜백
  */
 @Composable
 fun SimplePostListContent(
@@ -548,11 +541,6 @@ fun SimplePostListContent(
 
 /**
  * 푸시 알림 수신 여부를 설정하는 화면 컴포저블
- *
- * @param profile 사용자 프로필 및 알림 설정 데이터
- * @param onBack 뒤로가기 콜백
- * @param onToggleComment 댓글 알림 토글 콜백
- * @param onToggleLike 좋아요 알림 토글 콜백
  */
 @Composable
 fun NotificationSettingsContent(
@@ -624,9 +612,6 @@ fun NotificationSettingsContent(
 
 /**
  * 회원 탈퇴 안내 및 최종 동의를 확인하는 팝업 다이얼로그
- *
- * @param onDismiss 다이얼로그 닫기 콜백
- * @param onConfirmDelete 회원 탈퇴 확정 콜백
  */
 @Composable
 fun DeleteAccountDialog(
