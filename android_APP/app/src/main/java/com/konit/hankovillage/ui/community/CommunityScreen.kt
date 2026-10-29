@@ -22,7 +22,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
-import com.konit.hankovillage.ui.theme.AppBgColor
 import com.konit.hankovillage.ui.theme.BgColor
 import com.konit.hankovillage.ui.theme.CardBg
 import com.konit.hankovillage.ui.theme.PointOrange
@@ -44,7 +43,6 @@ fun CommunityScreen(
     currentNickname: String = "김뜨개",
     onRequireLogin: () -> Unit = {}
 ) {
-
     var selectedCategory by remember { mutableStateOf(CommunityCategory.ALL) }
     var searchQuery by remember { mutableStateOf("") }
 
@@ -85,6 +83,7 @@ fun CommunityScreen(
         } else {
             PostDetailContent(
                 post = selectedPost!!,
+                postList = postList,
                 isLoggedIn = isLoggedIn,
                 currentNickname = currentNickname,
                 onBack = { selectedPost = null },
@@ -293,6 +292,7 @@ fun PostCardItem(
 @Composable
 fun PostDetailContent(
     post: PostData,
+    postList: SnapshotStateList<PostData>,
     isLoggedIn: Boolean,
     currentNickname: String,
     onBack: () -> Unit,
@@ -310,8 +310,6 @@ fun PostDetailContent(
 
     var isLiked by remember(post.id) { mutableStateOf(post.isLiked) }
     var likeCount by remember(post.id) { mutableIntStateOf(post.likeCount) }
-
-    val commentsList = remember(post.id) { post.comments.toMutableStateList() }
 
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -401,15 +399,16 @@ fun PostDetailContent(
                         if (!isLoggedIn) {
                             onRequireAuth()
                         } else {
-                            isLiked = !isLiked
-                            if (isLiked) {
-                                likeCount++
-                                post.isLiked = true
-                                post.likeCount++
-                            } else {
-                                likeCount--
-                                post.isLiked = false
-                                post.likeCount--
+                            val nextLiked = !isLiked
+                            val nextCount = if (nextLiked) likeCount + 1 else (likeCount - 1).coerceAtLeast(0)
+
+                            isLiked = nextLiked
+                            likeCount = nextCount
+
+                            val updatedPost = post.copy(isLiked = nextLiked, likeCount = nextCount)
+                            val idx = postList.indexOfFirst { it.id == post.id }
+                            if (idx != -1) {
+                                postList[idx] = updatedPost
                             }
                         }
                     }) {
@@ -425,7 +424,7 @@ fun PostDetailContent(
                 HorizontalDivider(color = Color.LightGray)
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Text("댓글 목록 (${commentsList.size})", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextDark)
+                Text("댓글 목록 (${post.comments.size})", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextDark)
             }
 
             if (!isLoggedIn) {
@@ -433,7 +432,7 @@ fun PostDetailContent(
                     Text("로그인 후 댓글을 확인해 보세요.", color = Color.Gray, fontSize = 13.sp)
                 }
             } else {
-                items(commentsList, key = { it.id }) { comment ->
+                items(post.comments, key = { it.id }) { comment ->
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = CardBg),
@@ -465,7 +464,15 @@ fun PostDetailContent(
                                     TextButton(
                                         onClick = {
                                             if (commentToEditContent.isNotBlank()) {
-                                                comment.content = commentToEditContent.trim()
+                                                val updatedComments = post.comments.map {
+                                                    if (it.id == comment.id) it.copy(content = commentToEditContent.trim()) else it
+                                                }.toMutableList()
+
+                                                val updatedPost = post.copy(comments = updatedComments)
+                                                val idx = postList.indexOfFirst { it.id == post.id }
+                                                if (idx != -1) {
+                                                    postList[idx] = updatedPost
+                                                }
                                                 editingCommentId = null
                                             }
                                         },
@@ -536,16 +543,23 @@ fun PostDetailContent(
                             val newComment = CommentData(
                                 id = System.currentTimeMillis(),
                                 authorName = currentNickname,
-                                content = newCommentText,
+                                content = newCommentText.trim(),
                                 createdAt = "방금 전",
                                 isMyComment = true
                             )
-                            commentsList.add(newComment)
-                            post.comments.add(newComment)
+
+                            val updatedComments = post.comments.toMutableList().apply { add(newComment) }
+                            val updatedPost = post.copy(comments = updatedComments)
+
+                            val idx = postList.indexOfFirst { it.id == post.id }
+                            if (idx != -1) {
+                                postList[idx] = updatedPost
+                            }
+
                             newCommentText = ""
                             coroutineScope.launch {
-                                if (post.comments.isNotEmpty()) {
-                                    listState.animateScrollToItem(post.comments.size)
+                                if (updatedComments.isNotEmpty()) {
+                                    listState.animateScrollToItem(updatedComments.size)
                                 }
                             }
                         }
@@ -587,8 +601,13 @@ fun PostDetailContent(
             confirmButton = {
                 Button(
                     onClick = {
-                        commentsList.removeIf { it.id == commentToDeleteId }
-                        post.comments.removeIf { it.id == commentToDeleteId }
+                        val updatedComments = post.comments.filterNot { it.id == commentToDeleteId }.toMutableList()
+                        val updatedPost = post.copy(comments = updatedComments)
+
+                        val idx = postList.indexOfFirst { it.id == post.id }
+                        if (idx != -1) {
+                            postList[idx] = updatedPost
+                        }
                         commentToDeleteId = null
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
