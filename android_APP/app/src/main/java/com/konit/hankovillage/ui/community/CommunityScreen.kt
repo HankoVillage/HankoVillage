@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -626,7 +627,7 @@ fun PostDetailContent(
 }
 
 /**
- * 게시글 신규 등록 및 수정 폼 (사진 선택은 선택사항)
+ * 게시글 신규 등록 및 수정 폼 (키보드 자동 스크롤 및 imePadding 적용)
  */
 @Composable
 fun PostFormContent(
@@ -646,11 +647,15 @@ fun PostFormContent(
         uri?.let { imageUrl = it.toString() }
     }
 
+    val scrollState = rememberScrollState()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(BgColor)
-            .padding(16.dp),
+            .padding(16.dp)
+            .verticalScroll(scrollState)
+            .imePadding(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Row(
@@ -709,7 +714,6 @@ fun PostFormContent(
             modifier = Modifier.fillMaxWidth()
         )
 
-        // 사진 첨부 버튼 (선택사항)
         OutlinedButton(
             onClick = { galleryLauncher.launch("image/*") },
             modifier = Modifier
@@ -757,7 +761,7 @@ fun PostFormContent(
             label = { Text("내용") },
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f)
+                .height(250.dp)
         )
     }
 }
