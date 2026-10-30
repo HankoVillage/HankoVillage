@@ -1,6 +1,8 @@
 package com.konit.hankovillage.ui.community
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -17,11 +19,14 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import com.konit.hankovillage.ui.pattern.UriImage
 import com.konit.hankovillage.ui.theme.BgColor
 import com.konit.hankovillage.ui.theme.CardBg
 import com.konit.hankovillage.ui.theme.PointOrange
@@ -29,11 +34,6 @@ import com.konit.hankovillage.ui.theme.TextDark
 
 /**
  * 커뮤니티 메인 화면 컴포저블
- *
- * @param postList 전체 커뮤니티 게시글 목록 데이터 (MainScreen에서 호이스팅되어 전달받음)
- * @param isLoggedIn 사용자 로그인 상태 여부
- * @param currentNickname 현재 로그인한 사용자의 닉네임
- * @param onRequireLogin 비회원 기능 제한 시 로그인 화면으로 이동하는 콜백
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -215,7 +215,7 @@ fun CommunityScreen(
 }
 
 /**
- * 게시글 목록 아이템 카드를 표시하는 컴포저블
+ * 게시글 목록 아이템 카드 (사진이 있을 때만 우측에 1:1로 노출)
  */
 @Composable
 fun PostCardItem(
@@ -274,13 +274,16 @@ fun PostCardItem(
                 }
             }
 
-            Box(
-                modifier = Modifier
-                    .size(70.dp)
-                    .background(Color(0xFFDCD7C9), shape = RoundedCornerShape(8.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("사진", fontSize = 10.sp, color = Color.Gray)
+            if (!post.imageUrl.isNullOrEmpty()) {
+                UriImage(
+                    uriString = post.imageUrl!!,
+                    contentDescription = post.title,
+                    modifier = Modifier
+                        .size(70.dp)
+                        .aspectRatio(1f)
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop
+                )
             }
         }
     }
@@ -374,17 +377,19 @@ fun PostDetailContent(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp)
-                        .background(Color(0xFFDCD7C9), shape = RoundedCornerShape(12.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("게시글 본문 사진", color = Color.Gray)
+                // 본문 사진이 있는 경우에만 표시
+                if (!post.imageUrl.isNullOrEmpty()) {
+                    UriImage(
+                        uriString = post.imageUrl!!,
+                        contentDescription = post.title,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(240.dp)
+                            .clip(RoundedCornerShape(12.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
-
-                Spacer(modifier = Modifier.height(12.dp))
 
                 val displayContent = if (!isLoggedIn && post.content.length > 100) {
                     post.content.take(100) + "...\n\n나머지 본문과 댓글은 로그인 후 볼 수 있습니다."
@@ -621,7 +626,7 @@ fun PostDetailContent(
 }
 
 /**
- * 게시글 신규 등록 및 수정을 위한 입력 양식 컴포저블
+ * 게시글 신규 등록 및 수정 폼 (사진 선택은 선택사항)
  */
 @Composable
 fun PostFormContent(
@@ -633,6 +638,13 @@ fun PostFormContent(
     var title by remember { mutableStateOf(initialPost?.title ?: "") }
     var selectedCategory by remember { mutableStateOf(initialPost?.category ?: CommunityCategory.SHOWOFF) }
     var content by remember { mutableStateOf(initialPost?.content ?: "") }
+    var imageUrl by remember { mutableStateOf(initialPost?.imageUrl) }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { imageUrl = it.toString() }
+    }
 
     Column(
         modifier = Modifier
@@ -656,7 +668,8 @@ fun PostFormContent(
                         val result = initialPost?.copy(
                             title = title,
                             category = selectedCategory,
-                            content = content
+                            content = content,
+                            imageUrl = imageUrl
                         ) ?: PostData(
                             id = System.currentTimeMillis(),
                             title = title,
@@ -664,6 +677,7 @@ fun PostFormContent(
                             authorName = currentNickname,
                             createdAt = "방금 전",
                             content = content,
+                            imageUrl = imageUrl,
                             isMyPost = true
                         )
                         onSave(result)
@@ -695,13 +709,46 @@ fun PostFormContent(
             modifier = Modifier.fillMaxWidth()
         )
 
+        // 사진 첨부 버튼 (선택사항)
         OutlinedButton(
-            onClick = { },
-            modifier = Modifier.fillMaxWidth()
+            onClick = { galleryLauncher.launch("image/*") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(if (!imageUrl.isNullOrEmpty()) 150.dp else 50.dp),
+            shape = RoundedCornerShape(12.dp)
         ) {
-            Icon(Icons.Default.AddAPhoto, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("대표 사진 1장 선택/촬영")
+            if (!imageUrl.isNullOrEmpty()) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    UriImage(
+                        uriString = imageUrl!!,
+                        contentDescription = "첨부된 사진",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(6.dp),
+                        color = Color.Black.copy(alpha = 0.6f),
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text(
+                            text = "사진 변경",
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.AddAPhoto, contentDescription = null, tint = PointOrange)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("대표 사진 추가 (선택)", fontSize = 13.sp, color = PointOrange)
+                }
+            }
         }
 
         OutlinedTextField(
