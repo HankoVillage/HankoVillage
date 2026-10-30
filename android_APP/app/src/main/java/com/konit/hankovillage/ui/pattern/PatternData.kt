@@ -16,7 +16,7 @@ data class PatternData(
     var title: String,
     var tag: String,              // 의류, 목도리, 모자, 가방, 인형, 기타
     var yarnInfo: String = "",    // 실 정보
-    var needleInfo: String = "",  // 바늘 정보
     var patternUrl: String = "",  // 도안 링크 URL
+    var imageUrl: String? = null,
     var status: PatternStatus = PatternStatus.PLANNED
 )

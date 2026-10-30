@@ -245,6 +245,7 @@ fun MainScreen() {
                     ProfileScreen(
                         userProfile = currentSession.profile,
                         postList = postList,
+                        patternList = patternList,
                         onUpdateProfile = { updatedProfile ->
                             currentUserSession = currentUserSession?.copy(profile = updatedProfile)
                         },

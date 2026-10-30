@@ -25,6 +25,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 import com.konit.hankovillage.ui.community.PostData
+import com.konit.hankovillage.ui.pattern.PatternData
+import com.konit.hankovillage.ui.pattern.PatternStatus
+import com.konit.hankovillage.ui.pattern.UriImage
 import com.konit.hankovillage.ui.theme.BgColor
 import com.konit.hankovillage.ui.theme.CardBg
 import com.konit.hankovillage.ui.theme.PointOrange
@@ -36,6 +39,7 @@ import com.konit.hankovillage.ui.theme.TextDark
 enum class ProfileSubScreen {
     NONE, EDIT_PROFILE, MY_POSTS, LIKED_POSTS, NOTIFICATION_SETTINGS
 }
+
 /**
  * 마이페이지 메인 화면 컴포저블
  */
@@ -44,6 +48,7 @@ enum class ProfileSubScreen {
 fun ProfileScreen(
     userProfile: UserProfileData = UserProfileData(),
     postList: List<PostData> = emptyList(),
+    patternList: List<PatternData> = emptyList(),
     onUpdateProfile: (UserProfileData) -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
@@ -51,12 +56,9 @@ fun ProfileScreen(
 
     var profile by remember(userProfile) { mutableStateOf(userProfile) }
 
-    val completedWorks = remember {
-        listOf(
-            CompletedWork(1L, "가을 체크 머플러")
-        )
+    val completedWorks = remember(patternList) {
+        patternList.filter { it.status == PatternStatus.COMPLETED }
     }
-
     val myPosts = remember(postList, profile.nickname) {
         postList.filter { it.isMyPost || it.authorName == profile.nickname }
     }
@@ -81,16 +83,14 @@ fun ProfileScreen(
                 onSave = { updatedProfile ->
                     val oldNickname = profile.nickname
                     profile = updatedProfile
+
                     if (oldNickname != updatedProfile.nickname) {
-                        if (postList is androidx.compose.runtime.snapshots.SnapshotStateList) {
-                            postList.indices.forEach { index ->
-                                if (postList[index].isMyPost) {
-                                    postList[index] = postList[index].copy(authorName = updatedProfile.nickname)
+                        val stateList = postList as? androidx.compose.runtime.snapshots.SnapshotStateList<PostData>
+                        if (stateList != null) {
+                            stateList.indices.forEach { index ->
+                                if (stateList[index].isMyPost) {
+                                    stateList[index] = stateList[index].copy(authorName = updatedProfile.nickname)
                                 }
-                            }
-                        } else {
-                            postList.filter { it.isMyPost }.forEach { post ->
-                                // 만약 별도의 가변 처리가 되어있지 않다면 isMyPost 기반 필터링만으로도 마이페이지에는 잘 노출됩니다.
                             }
                         }
                     }
@@ -227,15 +227,15 @@ fun ProfileScreen(
                         Text("아직 완성된 도안이 없어요!", fontSize = 12.sp, color = Color.Gray)
                     }
                 } else {
-                    Row(
+                    androidx.compose.foundation.lazy.LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        completedWorks.forEach { work ->
+                        items(completedWorks, key = { it.id }) { pattern ->
                             Card(
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .height(100.dp),
+                                    .width(110.dp)
+                                    .aspectRatio(1f),
                                 shape = RoundedCornerShape(12.dp),
                                 colors = CardDefaults.cardColors(containerColor = CardBg)
                             ) {
@@ -243,20 +243,30 @@ fun ProfileScreen(
                                     modifier = Modifier.fillMaxSize(),
                                     contentAlignment = Alignment.BottomCenter
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(Color(0xFFDCD7C9)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text("사진", fontSize = 12.sp, color = Color.Gray)
+                                    if (!pattern.imageUrl.isNullOrEmpty()) {
+                                        UriImage(
+                                            uriString = pattern.imageUrl!!,
+                                            contentDescription = pattern.title,
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                        )
+                                    } else {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .background(Color(0xFFDCD7C9)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text("🧶", fontSize = 24.sp)
+                                        }
                                     }
+
                                     Surface(
                                         modifier = Modifier.fillMaxWidth(),
                                         color = Color.Black.copy(alpha = 0.5f)
                                     ) {
                                         Text(
-                                            text = work.title,
+                                            text = pattern.title,
                                             color = Color.White,
                                             fontSize = 10.sp,
                                             maxLines = 1,
