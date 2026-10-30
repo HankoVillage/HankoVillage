@@ -393,12 +393,31 @@ fun PatternDetailContent(
                 Text("< 도안 목록으로", color = PointOrange, fontWeight = FontWeight.Bold)
             }
 
-            IconButton(onClick = { showEditDialog = true }) {
-                Icon(
-                    imageVector = Icons.Default.Edit,
-                    contentDescription = "도안 수정",
-                    tint = TextDark
+            Card(
+                onClick = { showEditDialog = true },
+                modifier = Modifier.height(36.dp),
+                shape = RoundedCornerShape(10.dp),
+                border = androidx.compose.foundation.BorderStroke(
+                    width = 1.dp,
+                    color = Color(0xFF625340)
+                ),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFFEFF7DF)
                 )
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .padding(horizontal = 14.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "수정",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextDark
+                    )
+                }
             }
         }
 
