@@ -2,6 +2,8 @@ package com.konit.hankovillage.ui.profile
 
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -19,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -159,6 +162,7 @@ fun ProfileScreen(
                             .padding(16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
+                        // 📷 메인 프로필 사진 표시 영역 (profileImageUri 연동)
                         Box(
                             modifier = Modifier
                                 .size(80.dp)
@@ -166,12 +170,21 @@ fun ProfileScreen(
                                 .background(Color(0xFFDCD7C9)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = "프로필 사진",
-                                modifier = Modifier.size(50.dp),
-                                tint = Color.Gray
-                            )
+                            if (!profile.profileImageUri.isNullOrEmpty()) {
+                                UriImage(
+                                    uriString = profile.profileImageUri!!,
+                                    contentDescription = "프로필 사진",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = "기본 프로필",
+                                    modifier = Modifier.size(50.dp),
+                                    tint = Color.Gray
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(10.dp))
@@ -248,7 +261,7 @@ fun ProfileScreen(
                                             uriString = pattern.imageUrl!!,
                                             contentDescription = pattern.title,
                                             modifier = Modifier.fillMaxSize(),
-                                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                            contentScale = ContentScale.Crop
                                         )
                                     } else {
                                         Box(
@@ -392,7 +405,7 @@ fun ProfileMenuItem(
 }
 
 /**
- * 프로필 수정 화면 컴포저블
+ * 프로필 수정 화면 컴포저블 (profileImageUri 변경 연동)
  */
 @Composable
 fun EditProfileContent(
@@ -403,7 +416,15 @@ fun EditProfileContent(
     val context = LocalContext.current
     var nickname by remember { mutableStateOf(profile.nickname) }
     var bio by remember { mutableStateOf(profile.bio) }
+    var profileImageUri by remember { mutableStateOf(profile.profileImageUri) }
     var isCheckedNickname by remember { mutableStateOf(true) }
+
+    // 📷 갤러리 피커 런처
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { profileImageUri = it.toString() }
+    }
 
     Column(
         modifier = Modifier
@@ -424,7 +445,7 @@ fun EditProfileContent(
             Button(
                 onClick = {
                     if (isCheckedNickname && nickname.isNotBlank()) {
-                        onSave(profile.copy(nickname = nickname, bio = bio))
+                        onSave(profile.copy(nickname = nickname, bio = bio, profileImageUri = profileImageUri))
                     } else {
                         Toast.makeText(context, "닉네임 중복 확인을 해주세요.", Toast.LENGTH_SHORT).show()
                     }
@@ -438,18 +459,28 @@ fun EditProfileContent(
 
         Text("프로필 수정", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextDark)
 
+        // 📷 프로필 사진 변경 버튼 영역 (클릭 시 갤러리 열림)
         Box(
             modifier = Modifier
                 .size(90.dp)
                 .align(Alignment.CenterHorizontally)
                 .clip(CircleShape)
                 .background(Color(0xFFDCD7C9))
-                .clickable { },
+                .clickable { galleryLauncher.launch("image/*") },
             contentAlignment = Alignment.Center
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Default.CameraAlt, contentDescription = null, tint = PointOrange)
-                Text("사진 변경", fontSize = 10.sp, color = Color.Gray)
+            if (!profileImageUri.isNullOrEmpty()) {
+                UriImage(
+                    uriString = profileImageUri!!,
+                    contentDescription = "프로필 사진",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.CameraAlt, contentDescription = null, tint = PointOrange)
+                    Text("사진 변경", fontSize = 10.sp, color = Color.Gray)
+                }
             }
         }
 
