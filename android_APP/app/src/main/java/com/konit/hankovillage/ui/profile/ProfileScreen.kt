@@ -162,7 +162,6 @@ fun ProfileScreen(
                             .padding(16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // 📷 메인 프로필 사진 표시 영역 (profileImageUri 연동)
                         Box(
                             modifier = Modifier
                                 .size(80.dp)
@@ -270,7 +269,7 @@ fun ProfileScreen(
                                                 .background(Color(0xFFDCD7C9)),
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Text("🧶", fontSize = 24.sp)
+                                            Text("공란", fontSize = 24.sp)
                                         }
                                     }
 
@@ -419,7 +418,6 @@ fun EditProfileContent(
     var profileImageUri by remember { mutableStateOf(profile.profileImageUri) }
     var isCheckedNickname by remember { mutableStateOf(true) }
 
-    // 📷 갤러리 피커 런처
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
@@ -459,7 +457,6 @@ fun EditProfileContent(
 
         Text("프로필 수정", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextDark)
 
-        // 📷 프로필 사진 변경 버튼 영역 (클릭 시 갤러리 열림)
         Box(
             modifier = Modifier
                 .size(90.dp)

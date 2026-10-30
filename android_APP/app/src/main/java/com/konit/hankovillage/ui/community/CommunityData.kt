@@ -20,7 +20,7 @@ data class PostData(
     val id: Long = System.currentTimeMillis(),
     var title: String,
     var category: CommunityCategory,
-    val authorName: String, // "탈퇴한 사용자" 대응
+    val authorName: String,
     val createdAt: String,
     var content: String,
     var imageUrl: String? = null,

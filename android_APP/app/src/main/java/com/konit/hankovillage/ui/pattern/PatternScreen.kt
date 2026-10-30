@@ -19,7 +19,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddAPhoto
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -77,7 +76,7 @@ fun UriImage(
             modifier = modifier.background(Color.LightGray),
             contentAlignment = Alignment.Center
         ) {
-            Text("🧶", fontSize = 20.sp)
+            Text("--", fontSize = 20.sp)
         }
     }
 }
@@ -157,7 +156,7 @@ fun PatternScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "도안 보관소 📂",
+                    text = "도안 보관소 ",
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextDark
@@ -325,7 +324,7 @@ fun PatternCardItem(
                     contentDescription = pattern.title,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .aspectRatio(1f) // 1:1 비율 고정
+                        .aspectRatio(1f)
                         .clip(RoundedCornerShape(8.dp)),
                     contentScale = ContentScale.Crop
                 )
@@ -368,7 +367,6 @@ fun PatternDetailContent(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
 
-    // 📷 갤러리 피커 (선택 즉시 사진 업데이트)
     val detailGalleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
@@ -449,7 +447,7 @@ fun PatternDetailContent(
                         shape = RoundedCornerShape(6.dp)
                     ) {
                         Text(
-                            text = "📷 사진 변경",
+                            text = "사진 변경",
                             color = Color.White,
                             fontSize = 11.sp,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
@@ -469,7 +467,7 @@ fun PatternDetailContent(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "📷 완성작 / 도안 사진 등록하기",
+                        text = "완성작 / 도안 사진 등록하기",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = PointOrange
