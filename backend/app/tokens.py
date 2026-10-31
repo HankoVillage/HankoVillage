@@ -10,6 +10,7 @@ from app.config import settings
 ALGORITHM = "HS256"
 ACCESS_TOKEN_TYP = "access+jwt"
 ACCESS_TOKEN_LIFETIME = timedelta(hours=1)
+REFRESH_TOKEN_LIFETIME = timedelta(days=90)
 REFRESH_TOKEN_BYTES = 32
 
 
