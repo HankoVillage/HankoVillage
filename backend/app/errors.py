@@ -15,10 +15,11 @@ TITLE_OVERRIDES = {422: "Unprocessable Content"}
 
 
 class ApiError(Exception):
-    def __init__(self, status: int, code: str, detail: str):
+    def __init__(self, status: int, code: str, detail: str, headers: dict[str, str] | None = None,):
         self.status = status
         self.code = code
         self.detail = detail
+        self.headers = headers
         super().__init__(detail)
 
 
@@ -26,7 +27,7 @@ def status_title(status: int) -> str:
     return TITLE_OVERRIDES.get(status, HTTPStatus(status).phrase)
 
 
-def problem_response(status: int, code: str, detail: str, fields: list[str] | None = None) -> JSONResponse:
+def problem_response(status: int, code: str, detail: str, fields: list[str] | None = None, headers: dict[str, str] | None = None) -> JSONResponse:
     body = {
         "type": "about:blank",
         "title": status_title(status),
@@ -36,11 +37,11 @@ def problem_response(status: int, code: str, detail: str, fields: list[str] | No
     }
     if fields is not None:
         body["fields"] = fields
-    return JSONResponse(content=body, status_code=status, media_type=PROBLEM_JSON)
+    return JSONResponse(content=body, status_code=status, media_type=PROBLEM_JSON, headers=headers)
 
 
 async def handle_api_error(request: Request, exc: ApiError) -> JSONResponse:
-    return problem_response(exc.status, exc.code, exc.detail)
+    return problem_response(exc.status, exc.code, exc.detail, headers=exc.headers)
 
 
 async def handle_http_exception(request: Request, exc: StarletteHTTPException) -> JSONResponse:
