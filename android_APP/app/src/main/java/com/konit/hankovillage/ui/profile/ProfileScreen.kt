@@ -70,7 +70,16 @@ fun ProfileScreen(
         postList.filter { it.isLiked }
     }
 
-    var currentSubScreen by remember { mutableStateOf(ProfileSubScreen.NONE) }
+    var currentSubScreen by remember {
+        mutableStateOf(
+            if (userProfile.nickname.isBlank() || userProfile.nickname == "카카오뜨개러" || userProfile.nickname == "G메일뜨개러") {
+                ProfileSubScreen.EDIT_PROFILE
+            } else {
+                ProfileSubScreen.NONE
+            }
+        )
+    }
+
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showDeleteAccountDialog by remember { mutableStateOf(false) }
 
@@ -82,7 +91,9 @@ fun ProfileScreen(
         ProfileSubScreen.EDIT_PROFILE -> {
             EditProfileContent(
                 profile = profile,
-                onBack = { currentSubScreen = ProfileSubScreen.NONE },
+                onBack = {
+                    currentSubScreen = ProfileSubScreen.NONE
+                },
                 onSave = { updatedProfile ->
                     val oldNickname = profile.nickname
                     profile = updatedProfile
