@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, Text, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -27,7 +27,7 @@ class Post(Base):
     )
     category: Mapped[str] = mapped_column(String(10))
     title: Mapped[str] = mapped_column(String(100))
-    content: Mapped[str] = mapped_column(Text)
+    content: Mapped[str] = mapped_column(String(1000))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
