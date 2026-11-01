@@ -624,11 +624,19 @@ fun CounterScreen(
                             colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PointOrange, selectedLabelColor = Color.White)
                         )
                     }
-
                     OutlinedTextField(
                         value = editTitle,
-                        onValueChange = { editTitle = it },
-                        label = { Text("작품 이름") },
+                        onValueChange = { if (it.length <= 50) editTitle = it },
+                        label = { Text("작품 이름 (최대 50자)") },
+                        supportingText = {
+                            Text(
+                                text = "${editTitle.length}/50자",
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                                fontSize = 10.sp,
+                                color = Color.Gray
+                            )
+                        },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -636,8 +644,17 @@ fun CounterScreen(
                     Column {
                         OutlinedTextField(
                             value = editYarnAndNeedle,
-                            onValueChange = { editYarnAndNeedle = it },
-                            label = { Text("실 · 바늘 정보") },
+                            onValueChange = { if (it.length <= 50) editYarnAndNeedle = it },
+                            label = { Text("실 · 바늘 정보 (최대 50자)") },
+                            supportingText = {
+                                Text(
+                                    text = "${editYarnAndNeedle.length}/50자",
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                                    fontSize = 10.sp,
+                                    color = Color.Gray
+                                )
+                            },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -652,19 +669,25 @@ fun CounterScreen(
                             Text("실 보관소에서 불러오기", fontSize = 12.sp, color = PointOrange)
                         }
                     }
-
                     OutlinedTextField(
                         value = editCurrent,
-                        onValueChange = { editCurrent = it },
-                        label = { Text("현재 단수") },
+                        onValueChange = {
+                            val filtered = it.filter { char -> char.isDigit() }
+                            editCurrent = filtered
+                        },
+                        label = { Text("현재 단수 (0 이상)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+
                     OutlinedTextField(
                         value = editTarget,
-                        onValueChange = { editTarget = it },
-                        label = { Text("목표 단수") },
+                        onValueChange = {
+                            val filtered = it.filter { char -> char.isDigit() }
+                            editTarget = filtered
+                        },
+                        label = { Text("목표 단수 (선택 또는 1 이상)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
@@ -676,8 +699,8 @@ fun CounterScreen(
                     onClick = {
                         title = editTitle
                         yarnAndNeedle = editYarnAndNeedle
-                        currentRows = editCurrent.toIntOrNull() ?: currentRows
-                        totalRows = editTarget.toIntOrNull() ?: totalRows
+                        currentRows = editCurrent.toIntOrNull()?.coerceAtLeast(0) ?: currentRows
+                        totalRows = editTarget.toIntOrNull()?.coerceAtLeast(0) ?: totalRows
                         status = editStatus
 
                         saveCurrentProjectState(

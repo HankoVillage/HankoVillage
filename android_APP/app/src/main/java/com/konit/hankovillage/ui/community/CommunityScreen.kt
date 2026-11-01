@@ -627,7 +627,7 @@ fun PostDetailContent(
 }
 
 /**
- * 게시글 신규 등록 및 수정 폼 (키보드 자동 스크롤 및 imePadding 적용)
+ * 게시글 신규 등록 및 수정 폼 (서버 422 방지를 위한 제목/내용 글자 수 제한 및 키보드 자동 스크롤 적용)
  */
 @Composable
 fun PostFormContent(
@@ -708,8 +708,19 @@ fun PostFormContent(
 
         OutlinedTextField(
             value = title,
-            onValueChange = { title = it },
-            label = { Text("제목") },
+            onValueChange = {
+                if (it.length <= 100) title = it
+            },
+            label = { Text("제목 (최대 100자)") },
+            supportingText = {
+                Text(
+                    text = "${title.length}/100자",
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                    fontSize = 10.sp,
+                    color = Color.Gray
+                )
+            },
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
@@ -757,8 +768,19 @@ fun PostFormContent(
 
         OutlinedTextField(
             value = content,
-            onValueChange = { content = it },
+            onValueChange = {
+                if (it.length <= 1000) content = it
+            },
             label = { Text("내용") },
+            supportingText = {
+                Text(
+                    text = "${content.length}/1000자",
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                    fontSize = 10.sp,
+                    color = Color.Gray
+                )
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(250.dp)

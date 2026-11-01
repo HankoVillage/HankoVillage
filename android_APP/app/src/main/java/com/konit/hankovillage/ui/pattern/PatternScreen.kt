@@ -614,16 +614,16 @@ fun PatternDetailContent(
 }
 
 /**
- * 신규 도안 등록 다이얼로그
+ * 신규 도안 등록 다이얼로그 (서버 422 방지를 위한 제목/실 정보 글자 수 제한 적용)
  */
 @Composable
 fun PatternUploadDialog(
     onDismiss: () -> Unit,
     onConfirm: (PatternData) -> Unit
 ) {
-    var title by remember { mutableStateOf("") }
+    var title by remember { mutableStateOf("") } // 최대 50자 제한
     var selectedTag by remember { mutableStateOf(AvailableTags.first()) }
-    var yarnInfo by remember { mutableStateOf("") }
+    var yarnInfo by remember { mutableStateOf("") } // 최대 50자 제한
     var patternUrl by remember { mutableStateOf("") }
     var imageUri by remember { mutableStateOf<String?>(null) }
 
@@ -665,8 +665,17 @@ fun PatternUploadDialog(
 
                 OutlinedTextField(
                     value = title,
-                    onValueChange = { title = it },
-                    label = { Text("도안 제목 *") },
+                    onValueChange = { if (it.length <= 50) title = it },
+                    label = { Text("도안 제목 (최대 50자) *") },
+                    supportingText = {
+                        Text(
+                            text = "${title.length}/50자",
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                            fontSize = 10.sp,
+                            color = Color.Gray
+                        )
+                    },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -689,8 +698,17 @@ fun PatternUploadDialog(
 
                 OutlinedTextField(
                     value = yarnInfo,
-                    onValueChange = { yarnInfo = it },
-                    label = { Text("사용 실 (선택)") },
+                    onValueChange = { if (it.length <= 50) yarnInfo = it },
+                    label = { Text("사용 실 (최대 50자)") },
+                    supportingText = {
+                        Text(
+                            text = "${yarnInfo.length}/50자",
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                            fontSize = 10.sp,
+                            color = Color.Gray
+                        )
+                    },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -741,7 +759,7 @@ fun PatternUploadDialog(
 }
 
 /**
- * 기존 도안 정보 수정 다이얼로그
+ * 기존 도안 정보 수정 다이얼로그 (서버 422 방지를 위한 제목/실 정보 글자 수 제한 적용)
  */
 @Composable
 fun PatternEditDialog(
@@ -793,8 +811,17 @@ fun PatternEditDialog(
 
                 OutlinedTextField(
                     value = title,
-                    onValueChange = { title = it },
-                    label = { Text("도안 제목") },
+                    onValueChange = { if (it.length <= 50) title = it },
+                    label = { Text("도안 제목 (최대 50자)") },
+                    supportingText = {
+                        Text(
+                            text = "${title.length}/50자",
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                            fontSize = 10.sp,
+                            color = Color.Gray
+                        )
+                    },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -817,8 +844,17 @@ fun PatternEditDialog(
 
                 OutlinedTextField(
                     value = yarnInfo,
-                    onValueChange = { yarnInfo = it },
-                    label = { Text("사용 실") },
+                    onValueChange = { if (it.length <= 50) yarnInfo = it },
+                    label = { Text("사용 실 (최대 50자)") },
+                    supportingText = {
+                        Text(
+                            text = "${yarnInfo.length}/50자",
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                            fontSize = 10.sp,
+                            color = Color.Gray
+                        )
+                    },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )

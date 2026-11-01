@@ -404,7 +404,7 @@ fun ProfileMenuItem(
 }
 
 /**
- * 프로필 수정 화면 컴포저블 (profileImageUri 변경 연동)
+ * 프로필 수정 화면 컴포저블
  */
 @Composable
 fun EditProfileContent(
@@ -428,7 +428,8 @@ fun EditProfileContent(
         modifier = Modifier
             .fillMaxSize()
             .background(BgColor)
-            .padding(16.dp),
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Row(
@@ -489,10 +490,21 @@ fun EditProfileContent(
             OutlinedTextField(
                 value = nickname,
                 onValueChange = {
-                    nickname = it
-                    isCheckedNickname = false
+                    if (it.length <= 10) {
+                        nickname = it
+                        isCheckedNickname = false
+                    }
                 },
-                label = { Text("닉네임 *") },
+                label = { Text("닉네임 (2~10자) *") },
+                supportingText = {
+                    Text(
+                        text = "${nickname.length}/10자",
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                        fontSize = 10.sp,
+                        color = Color.Gray
+                    )
+                },
                 singleLine = true,
                 modifier = Modifier.weight(1f)
             )
@@ -503,7 +515,7 @@ fun EditProfileContent(
                     Toast.makeText(context, "사용 가능한 닉네임입니다.", Toast.LENGTH_SHORT).show()
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = CardBg),
-                modifier = Modifier.padding(top = 6.dp)
+                modifier = Modifier.padding(bottom = 16.dp)
             ) {
                 Text("중복 확인", color = TextDark, fontSize = 12.sp)
             }
@@ -511,11 +523,22 @@ fun EditProfileContent(
 
         OutlinedTextField(
             value = bio,
-            onValueChange = { bio = it },
-            label = { Text("소개글") },
+            onValueChange = {
+                if (it.length <= 30) bio = it
+            },
+            label = { Text("소개글 (최대 30자)") },
+            supportingText = {
+                Text(
+                    text = "${bio.length}/30자",
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                    fontSize = 10.sp,
+                    color = Color.Gray
+                )
+            },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(100.dp)
+                .height(120.dp)
         )
     }
 }

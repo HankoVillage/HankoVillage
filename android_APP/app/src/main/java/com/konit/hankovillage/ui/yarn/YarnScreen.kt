@@ -58,7 +58,6 @@ fun YarnScreen(
         }
     }
 
-    // 선택된 실이 있는 경우 전체 상세 화면 전환
     if (selectedYarn != null) {
         BackHandler {
             selectedYarn = null
@@ -78,7 +77,6 @@ fun YarnScreen(
             }
         )
     } else {
-        // 실 보관소 메인 목록 화면
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -133,7 +131,6 @@ fun YarnScreen(
         }
     }
 
-    // 신규 실 등록 다이얼로그
     if (showAddDialog) {
         YarnUploadDialog(
             onDismiss = { showAddDialog = false },
@@ -206,7 +203,7 @@ fun YarnCardItem(
 }
 
 /**
- * 📄 실 상세 보기 화면 (전체 화면 형태)
+ * 실 상세 보기 화면 (전체 화면 형태)
  */
 @Composable
 fun YarnDetailContent(
@@ -422,18 +419,18 @@ fun YarnDetailContent(
 }
 
 /**
- * 신규 실 등록 다이얼로그
+ * 신규 실 등록 다이얼로그 (서버 422 에러 방지를 위한 글자 수 제한 및 카운터 가이드 적용)
  */
 @Composable
 fun YarnUploadDialog(
     onDismiss: () -> Unit,
     onConfirm: (YarnData) -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
-    var color by remember { mutableStateOf("") }
-    var shop by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf("") }         // 최대 50자 제한
+    var color by remember { mutableStateOf("") }        // 최대 30자 제한
+    var shop by remember { mutableStateOf("") }         // 최대 100자 제한
     var purchaseDate by remember { mutableStateOf("") }
-    var memo by remember { mutableStateOf("") }
+    var memo by remember { mutableStateOf("") }         // 최대 100자 제한
     var imageUri by remember { mutableStateOf<String?>(null) }
 
     val galleryLauncher = rememberLauncherForActivityResult(
@@ -474,24 +471,51 @@ fun YarnUploadDialog(
 
                 OutlinedTextField(
                     value = name,
-                    onValueChange = { name = it },
-                    label = { Text("실 이름 *") },
+                    onValueChange = { if (it.length <= 50) name = it },
+                    label = { Text("실 이름 (최대 50자) *") },
+                    supportingText = {
+                        Text(
+                            text = "${name.length}/50자",
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                            fontSize = 10.sp,
+                            color = Color.Gray
+                        )
+                    },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 OutlinedTextField(
                     value = color,
-                    onValueChange = { color = it },
-                    label = { Text("색상 / 번호 (선택)") },
+                    onValueChange = { if (it.length <= 30) color = it },
+                    label = { Text("색상 / 번호 (최대 30자)") },
+                    supportingText = {
+                        Text(
+                            text = "${color.length}/30자",
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                            fontSize = 10.sp,
+                            color = Color.Gray
+                        )
+                    },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 OutlinedTextField(
                     value = shop,
-                    onValueChange = { shop = it },
-                    label = { Text("구매처 (선택)") },
+                    onValueChange = { if (it.length <= 100) shop = it },
+                    label = { Text("구매처 (최대 100자)") },
+                    supportingText = {
+                        Text(
+                            text = "${shop.length}/100자",
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                            fontSize = 10.sp,
+                            color = Color.Gray
+                        )
+                    },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -506,8 +530,17 @@ fun YarnUploadDialog(
 
                 OutlinedTextField(
                     value = memo,
-                    onValueChange = { memo = it },
-                    label = { Text("메모 (선택)") },
+                    onValueChange = { if (it.length <= 100) memo = it },
+                    label = { Text("메모 (최대 100자)") },
+                    supportingText = {
+                        Text(
+                            text = "${memo.length}/100자",
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                            fontSize = 10.sp,
+                            color = Color.Gray
+                        )
+                    },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -540,7 +573,7 @@ fun YarnUploadDialog(
 }
 
 /**
- * 실 정보 수정 다이얼로그
+ * 실 정보 수정 다이얼로그 (서버 422 에러 방지를 위한 글자 수 제한 및 카운터 가이드 적용)
  */
 @Composable
 fun YarnEditDialog(
@@ -593,24 +626,51 @@ fun YarnEditDialog(
 
                 OutlinedTextField(
                     value = name,
-                    onValueChange = { name = it },
-                    label = { Text("실 이름") },
+                    onValueChange = { if (it.length <= 50) name = it },
+                    label = { Text("실 이름 (최대 50자)") },
+                    supportingText = {
+                        Text(
+                            text = "${name.length}/50자",
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                            fontSize = 10.sp,
+                            color = Color.Gray
+                        )
+                    },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 OutlinedTextField(
                     value = color,
-                    onValueChange = { color = it },
-                    label = { Text("색상 / 번호") },
+                    onValueChange = { if (it.length <= 30) color = it },
+                    label = { Text("색상 / 번호 (최대 30자)") },
+                    supportingText = {
+                        Text(
+                            text = "${color.length}/30자",
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                            fontSize = 10.sp,
+                            color = Color.Gray
+                        )
+                    },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 OutlinedTextField(
                     value = shop,
-                    onValueChange = { shop = it },
-                    label = { Text("구매처") },
+                    onValueChange = { if (it.length <= 100) shop = it },
+                    label = { Text("구매처 (최대 100자)") },
+                    supportingText = {
+                        Text(
+                            text = "${shop.length}/100자",
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                            fontSize = 10.sp,
+                            color = Color.Gray
+                        )
+                    },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -625,8 +685,17 @@ fun YarnEditDialog(
 
                 OutlinedTextField(
                     value = memo,
-                    onValueChange = { memo = it },
-                    label = { Text("메모") },
+                    onValueChange = { if (it.length <= 100) memo = it },
+                    label = { Text("메모 (최대 100자)") },
+                    supportingText = {
+                        Text(
+                            text = "${memo.length}/100자",
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                            fontSize = 10.sp,
+                            color = Color.Gray
+                        )
+                    },
                     modifier = Modifier.fillMaxWidth()
                 )
             }

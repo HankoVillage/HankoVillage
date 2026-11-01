@@ -25,11 +25,6 @@ private val PointOrange = Color(0xFFD36D33)
 
 /**
  * 등록된 프로젝트 카운터 목록을 조회하고, 신규 카운터를 추가하거나 선택/삭제하는 화면 컴포저블
- *
- * @param projectList 등록된 프로젝트 데이터 목록
- * @param onAddProject 프로젝트 추가 콜백
- * @param onDeleteProject 프로젝트 삭제 콜백
- * @param onProjectSelect 특정 프로젝트 선택 콜백
  */
 @Composable
 fun ProjectListScreen(
@@ -65,6 +60,7 @@ fun ProjectListScreen(
                         status = "진행",
                         memo = ""
                     )
+                    onAddProject(newProject)
                     onProjectSelect(newProject)
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = PointOrange),
@@ -76,17 +72,29 @@ fun ProjectListScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(projectList, key = { it.id }) { project ->
-                ProjectCardItem(
-                    project = project,
-                    onClick = { onProjectSelect(project) },
-                    onDelete = { onDeleteProject(project) }
-                )
+        if (projectList.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("등록된 카운터가 없습니다.\n'+ 새 카운터'를 눌러 시작해보세요!", fontSize = 13.sp, color = Color.Gray, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            }
+        } else {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                items(projectList, key = { it.id }) { project ->
+                    ProjectCardItem(
+                        project = project,
+                        onClick = { onProjectSelect(project) },
+                        onDelete = { onDeleteProject(project) }
+                    )
+                }
             }
         }
     }
@@ -94,10 +102,6 @@ fun ProjectListScreen(
 
 /**
  * 개별 카운터 카드 항목 컴포저블
- *
- * @param project 표시할 카운터 프로젝트 데이터
- * @param onClick 카드 영역 클릭 시 실행할 행동
- * @param onDelete 카드 삭제 클릭 시 실행할 행동
  */
 @Composable
 fun ProjectCardItem(
@@ -116,7 +120,9 @@ fun ProjectCardItem(
         colors = CardDefaults.cardColors(containerColor = CardBg)
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(14.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             Row(
@@ -144,15 +150,26 @@ fun ProjectCardItem(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Delete,
-                        contentDescription = "도안 삭제",
+                        contentDescription = "카운터 삭제",
                         tint = Color.Gray
                     )
                 }
             }
 
             Column {
-                Text(text = project.title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextDark)
-                Text(text = project.yarnAndNeedle, fontSize = 11.sp, color = Color.Gray)
+                Text(
+                    text = project.title,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextDark,
+                    maxLines = 1
+                )
+                Text(
+                    text = project.yarnAndNeedle,
+                    fontSize = 11.sp,
+                    color = Color.Gray,
+                    maxLines = 1
+                )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "${project.currentRows} / ${project.totalRows}단",
@@ -167,8 +184,8 @@ fun ProjectCardItem(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("도안 삭제") },
-            text = { Text("'${project.title}' 도안을 완전히 삭제하시겠습니까?") },
+            title = { Text("카운터 삭제", fontWeight = FontWeight.Bold) },
+            text = { Text("'${project.title}' 카운터를 완전히 삭제하시겠습니까?") },
             confirmButton = {
                 Button(
                     onClick = {
@@ -182,7 +199,7 @@ fun ProjectCardItem(
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirm = false }) {
-                    Text("취소")
+                    Text("취소", color = Color.Gray)
                 }
             }
         )
