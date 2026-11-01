@@ -1,11 +1,29 @@
 package com.konit.hankovillage.ui.yarn
 
+/**
+ * 실 데이터 클래스
+ */
 data class YarnData(
     val id: Long = System.currentTimeMillis(),
-    var name: String,              // 실 이름
-    var color: String,             // 색상
-    var shop: String = "",         // 구매처
-    var purchaseDate: String = "", // 구매일
-    var memo: String = "",         // 메모
-    var imageUri: String? = null   // 사진 (카메라/앨범 선택 URI)
-)
+    var name: String,
+    var color: String,
+    var shop: String = "",
+    var purchaseDate: String = "",
+    var memo: String = "",
+    var imageUrl: String? = null
+) {
+    init {
+        if (name.length > 50) {
+            name = name.take(50)
+        }
+        if (color.length > 30) {
+            color = color.take(30)
+        }
+        if (shop.length > 100) {
+            shop = shop.take(100)
+        }
+        if (memo.length > 100) {
+            memo = memo.take(100)
+        }
+    }
+}

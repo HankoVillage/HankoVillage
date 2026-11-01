@@ -29,11 +29,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.konit.hankovillage.ui.yarn.YarnData
-
-private val BgColor = Color(0xFFF7F4EB)
-private val CardBg = Color(0xFFEFECE1)
-private val TextDark = Color(0xFF332D29)
-private val PointOrange = Color(0xFFD36D33)
+import com.konit.hankovillage.ui.theme.AppBgColor
+import com.konit.hankovillage.ui.theme.BgColor
+import com.konit.hankovillage.ui.theme.CardBg
+import com.konit.hankovillage.ui.theme.PointOrange
+import com.konit.hankovillage.ui.theme.TextDark
 
 data class MemoItem(
     val id: Long = System.currentTimeMillis(),
@@ -44,7 +44,7 @@ data class MemoItem(
 @Composable
 fun CounterScreen(
     project: ProjectData,
-    yarnList: List<YarnData> = emptyList(), // 실 보관소 연동 리스트
+    yarnList: List<YarnData> = emptyList(),
     onBackClick: () -> Unit,
     onSaveProject: (ProjectData) -> Unit = {}
 ) {
@@ -82,7 +82,6 @@ fun CounterScreen(
         }
     }
 
-    // 💡 변경된 프로젝트 데이터 저장 함수
     fun saveCurrentProjectState(
         updatedRows: Int = currentRows,
         updatedTitle: String = title,
@@ -125,7 +124,6 @@ fun CounterScreen(
             .verticalScroll(scrollState)
             .imePadding()
     ) {
-        // 상단 바 (저장하기 버튼 제거 -> < 목록으로 만 남김)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Start,
@@ -251,7 +249,6 @@ fun CounterScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 단수 조정 버튼 (+, - 누를 때 바로 즉시 자동 저장)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -476,7 +473,6 @@ fun CounterScreen(
         }
     }
 
-    // 메모 추가 다이얼로그 (저장 시 자동 상태 저장)
     if (showMemoDialog) {
         AlertDialog(
             onDismissRequest = { showMemoDialog = false },
@@ -516,7 +512,6 @@ fun CounterScreen(
         )
     }
 
-    // 메모 수정 다이얼로그
     if (editingMemo != null) {
         AlertDialog(
             onDismissRequest = { editingMemo = null },
@@ -552,7 +547,6 @@ fun CounterScreen(
         )
     }
 
-    // 메모 삭제 다이얼로그
     if (memoToDelete != null) {
         AlertDialog(
             onDismissRequest = { memoToDelete = null },
@@ -578,7 +572,6 @@ fun CounterScreen(
         )
     }
 
-    // 단수 초기화 다이얼로그
     if (showResetDialog) {
         AlertDialog(
             onDismissRequest = { showResetDialog = false },
@@ -602,7 +595,6 @@ fun CounterScreen(
         )
     }
 
-    // 정보 수정 다이얼로그 (실 보관소 연동 + 진행 상황 수정 추가)
     if (showEditDialog) {
         var editTitle by remember { mutableStateOf(title) }
         var editYarnAndNeedle by remember { mutableStateOf(yarnAndNeedle) }
@@ -632,11 +624,19 @@ fun CounterScreen(
                             colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PointOrange, selectedLabelColor = Color.White)
                         )
                     }
-
                     OutlinedTextField(
                         value = editTitle,
-                        onValueChange = { editTitle = it },
-                        label = { Text("작품 이름") },
+                        onValueChange = { if (it.length <= 50) editTitle = it },
+                        label = { Text("작품 이름 (최대 50자)") },
+                        supportingText = {
+                            Text(
+                                text = "${editTitle.length}/50자",
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                                fontSize = 10.sp,
+                                color = Color.Gray
+                            )
+                        },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -644,8 +644,17 @@ fun CounterScreen(
                     Column {
                         OutlinedTextField(
                             value = editYarnAndNeedle,
-                            onValueChange = { editYarnAndNeedle = it },
-                            label = { Text("실 · 바늘 정보") },
+                            onValueChange = { if (it.length <= 50) editYarnAndNeedle = it },
+                            label = { Text("실 · 바늘 정보 (최대 50자)") },
+                            supportingText = {
+                                Text(
+                                    text = "${editYarnAndNeedle.length}/50자",
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                                    fontSize = 10.sp,
+                                    color = Color.Gray
+                                )
+                            },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -657,22 +666,28 @@ fun CounterScreen(
                         ) {
                             Icon(Icons.Default.ShoppingBag, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("🧶 실 보관소에서 불러오기", fontSize = 12.sp, color = PointOrange)
+                            Text("실 보관소에서 불러오기", fontSize = 12.sp, color = PointOrange)
                         }
                     }
-
                     OutlinedTextField(
                         value = editCurrent,
-                        onValueChange = { editCurrent = it },
-                        label = { Text("현재 단수") },
+                        onValueChange = {
+                            val filtered = it.filter { char -> char.isDigit() }
+                            editCurrent = filtered
+                        },
+                        label = { Text("현재 단수 (0 이상)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+
                     OutlinedTextField(
                         value = editTarget,
-                        onValueChange = { editTarget = it },
-                        label = { Text("목표 단수") },
+                        onValueChange = {
+                            val filtered = it.filter { char -> char.isDigit() }
+                            editTarget = filtered
+                        },
+                        label = { Text("목표 단수 (선택 또는 1 이상)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
@@ -684,8 +699,8 @@ fun CounterScreen(
                     onClick = {
                         title = editTitle
                         yarnAndNeedle = editYarnAndNeedle
-                        currentRows = editCurrent.toIntOrNull() ?: currentRows
-                        totalRows = editTarget.toIntOrNull() ?: totalRows
+                        currentRows = editCurrent.toIntOrNull()?.coerceAtLeast(0) ?: currentRows
+                        totalRows = editTarget.toIntOrNull()?.coerceAtLeast(0) ?: totalRows
                         status = editStatus
 
                         saveCurrentProjectState(
@@ -710,8 +725,6 @@ fun CounterScreen(
             }
         )
 
-        // 실 보관소 선택 다이얼로그
-
         if (showYarnSelectDialog) {
             AlertDialog(
                 onDismissRequest = { showYarnSelectDialog = false },
@@ -727,7 +740,6 @@ fun CounterScreen(
                             items(yarnList) { yarn ->
                                 Card(
                                     onClick = {
-                                        // YarnData의 필드명에 맞추어 실 이름과 정보 자동 완성
                                         editYarnAndNeedle = yarn.name
                                         showYarnSelectDialog = false
                                     },

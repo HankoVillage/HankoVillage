@@ -2,6 +2,8 @@ package com.konit.hankovillage.ui.profile
 
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -19,16 +21,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.konit.hankovillage.ui.community.PostData
 
-val BgColor = Color(0xFFF7F4EB)
-val CardBg = Color(0xFFEFECE1)
-val PointOrange = Color(0xFFD36D33)
-val TextDark = Color(0xFF332D29)
+import com.konit.hankovillage.ui.community.PostData
+import com.konit.hankovillage.ui.pattern.PatternData
+import com.konit.hankovillage.ui.pattern.PatternStatus
+import com.konit.hankovillage.ui.pattern.UriImage
+import com.konit.hankovillage.ui.theme.BgColor
+import com.konit.hankovillage.ui.theme.CardBg
+import com.konit.hankovillage.ui.theme.PointOrange
+import com.konit.hankovillage.ui.theme.TextDark
 
 /**
  * 마이페이지 내 세부 서브 화면 이동을 위한 내비게이션 상태 정의
@@ -39,17 +45,13 @@ enum class ProfileSubScreen {
 
 /**
  * 마이페이지 메인 화면 컴포저블
- *
- * @param userProfile 사용자 프로필 데이터
- * @param postList 커뮤니티의 전체 게시글 리스트 (실시간 연동용)
- * @param onUpdateProfile 프로필 정보 수정 완료 시 호출되는 콜백
- * @param onLogout 로그아웃 시 호출되는 콜백
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     userProfile: UserProfileData = UserProfileData(),
     postList: List<PostData> = emptyList(),
+    patternList: List<PatternData> = emptyList(),
     onUpdateProfile: (UserProfileData) -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
@@ -57,24 +59,27 @@ fun ProfileScreen(
 
     var profile by remember(userProfile) { mutableStateOf(userProfile) }
 
-    val completedWorks = remember {
-        listOf(
-            CompletedWork(1L, "가을 체크 머플러")
+    val completedWorks = remember(patternList) {
+        patternList.filter { it.status == PatternStatus.COMPLETED }
+    }
+    val myPosts = remember(postList, profile.nickname) {
+        postList.filter { it.isMyPost || it.authorName == profile.nickname }
+    }
+
+    val likedPosts = remember(postList) {
+        postList.filter { it.isLiked }
+    }
+
+    var currentSubScreen by remember {
+        mutableStateOf(
+            if (userProfile.nickname.isBlank() || userProfile.nickname == "카카오뜨개러" || userProfile.nickname == "G메일뜨개러") {
+                ProfileSubScreen.EDIT_PROFILE
+            } else {
+                ProfileSubScreen.NONE
+            }
         )
     }
 
-    val myPosts by remember {
-        derivedStateOf {
-            postList.filter { it.isMyPost || it.authorName == profile.nickname }
-        }
-    }
-    val likedPosts by remember {
-        derivedStateOf {
-            postList.filter { it.isLiked  }
-        }
-    }
-
-    var currentSubScreen by remember { mutableStateOf(ProfileSubScreen.NONE) }
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showDeleteAccountDialog by remember { mutableStateOf(false) }
 
@@ -86,9 +91,24 @@ fun ProfileScreen(
         ProfileSubScreen.EDIT_PROFILE -> {
             EditProfileContent(
                 profile = profile,
-                onBack = { currentSubScreen = ProfileSubScreen.NONE },
+                onBack = {
+                    currentSubScreen = ProfileSubScreen.NONE
+                },
                 onSave = { updatedProfile ->
+                    val oldNickname = profile.nickname
                     profile = updatedProfile
+
+                    if (oldNickname != updatedProfile.nickname) {
+                        val stateList = postList as? androidx.compose.runtime.snapshots.SnapshotStateList<PostData>
+                        if (stateList != null) {
+                            stateList.indices.forEach { index ->
+                                if (stateList[index].isMyPost) {
+                                    stateList[index] = stateList[index].copy(authorName = updatedProfile.nickname)
+                                }
+                            }
+                        }
+                    }
+
                     onUpdateProfile(updatedProfile)
                     Toast.makeText(context, "프로필이 수정되었습니다.", Toast.LENGTH_SHORT).show()
                     currentSubScreen = ProfileSubScreen.NONE
@@ -160,12 +180,21 @@ fun ProfileScreen(
                                 .background(Color(0xFFDCD7C9)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = "프로필 사진",
-                                modifier = Modifier.size(50.dp),
-                                tint = Color.Gray
-                            )
+                            if (!profile.profileImageUri.isNullOrEmpty()) {
+                                UriImage(
+                                    uriString = profile.profileImageUri!!,
+                                    contentDescription = "프로필 사진",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = "기본 프로필",
+                                    modifier = Modifier.size(50.dp),
+                                    tint = Color.Gray
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(10.dp))
@@ -221,15 +250,15 @@ fun ProfileScreen(
                         Text("아직 완성된 도안이 없어요!", fontSize = 12.sp, color = Color.Gray)
                     }
                 } else {
-                    Row(
+                    androidx.compose.foundation.lazy.LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        completedWorks.forEach { work ->
+                        items(completedWorks, key = { it.id }) { pattern ->
                             Card(
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .height(100.dp),
+                                    .width(110.dp)
+                                    .aspectRatio(1f),
                                 shape = RoundedCornerShape(12.dp),
                                 colors = CardDefaults.cardColors(containerColor = CardBg)
                             ) {
@@ -237,20 +266,30 @@ fun ProfileScreen(
                                     modifier = Modifier.fillMaxSize(),
                                     contentAlignment = Alignment.BottomCenter
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(Color(0xFFDCD7C9)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text("사진", fontSize = 12.sp, color = Color.Gray)
+                                    if (!pattern.imageUrl.isNullOrEmpty()) {
+                                        UriImage(
+                                            uriString = pattern.imageUrl!!,
+                                            contentDescription = pattern.title,
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    } else {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .background(Color(0xFFDCD7C9)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text("공란", fontSize = 24.sp)
+                                        }
                                     }
+
                                     Surface(
                                         modifier = Modifier.fillMaxWidth(),
                                         color = Color.Black.copy(alpha = 0.5f)
                                     ) {
                                         Text(
-                                            text = work.title,
+                                            text = pattern.title,
                                             color = Color.White,
                                             fontSize = 10.sp,
                                             maxLines = 1,
@@ -350,11 +389,6 @@ fun ProfileScreen(
 
 /**
  * 프로필 메뉴 항목 아이템 컴포저블
- *
- * @param icon 메뉴 아이콘
- * @param title 메뉴 제목
- * @param titleColor 메뉴 텍스트 색상
- * @param onClick 메뉴 선택 시 콜백
  */
 @Composable
 fun ProfileMenuItem(
@@ -382,10 +416,6 @@ fun ProfileMenuItem(
 
 /**
  * 프로필 수정 화면 컴포저블
- *
- * @param profile 기존 프로필 데이터
- * @param onBack 이전 화면 전환 콜백
- * @param onSave 수정 데이터 저장 콜백
  */
 @Composable
 fun EditProfileContent(
@@ -396,13 +426,21 @@ fun EditProfileContent(
     val context = LocalContext.current
     var nickname by remember { mutableStateOf(profile.nickname) }
     var bio by remember { mutableStateOf(profile.bio) }
+    var profileImageUri by remember { mutableStateOf(profile.profileImageUri) }
     var isCheckedNickname by remember { mutableStateOf(true) }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { profileImageUri = it.toString() }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(BgColor)
-            .padding(16.dp),
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Row(
@@ -417,7 +455,7 @@ fun EditProfileContent(
             Button(
                 onClick = {
                     if (isCheckedNickname && nickname.isNotBlank()) {
-                        onSave(profile.copy(nickname = nickname, bio = bio))
+                        onSave(profile.copy(nickname = nickname, bio = bio, profileImageUri = profileImageUri))
                     } else {
                         Toast.makeText(context, "닉네임 중복 확인을 해주세요.", Toast.LENGTH_SHORT).show()
                     }
@@ -437,12 +475,21 @@ fun EditProfileContent(
                 .align(Alignment.CenterHorizontally)
                 .clip(CircleShape)
                 .background(Color(0xFFDCD7C9))
-                .clickable { },
+                .clickable { galleryLauncher.launch("image/*") },
             contentAlignment = Alignment.Center
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Default.CameraAlt, contentDescription = null, tint = PointOrange)
-                Text("사진 변경", fontSize = 10.sp, color = Color.Gray)
+            if (!profileImageUri.isNullOrEmpty()) {
+                UriImage(
+                    uriString = profileImageUri!!,
+                    contentDescription = "프로필 사진",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.CameraAlt, contentDescription = null, tint = PointOrange)
+                    Text("사진 변경", fontSize = 10.sp, color = Color.Gray)
+                }
             }
         }
 
@@ -454,10 +501,21 @@ fun EditProfileContent(
             OutlinedTextField(
                 value = nickname,
                 onValueChange = {
-                    nickname = it
-                    isCheckedNickname = false
+                    if (it.length <= 10) {
+                        nickname = it
+                        isCheckedNickname = false
+                    }
                 },
-                label = { Text("닉네임 *") },
+                label = { Text("닉네임 (2~10자) *") },
+                supportingText = {
+                    Text(
+                        text = "${nickname.length}/10자",
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                        fontSize = 10.sp,
+                        color = Color.Gray
+                    )
+                },
                 singleLine = true,
                 modifier = Modifier.weight(1f)
             )
@@ -468,7 +526,7 @@ fun EditProfileContent(
                     Toast.makeText(context, "사용 가능한 닉네임입니다.", Toast.LENGTH_SHORT).show()
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = CardBg),
-                modifier = Modifier.padding(top = 6.dp)
+                modifier = Modifier.padding(bottom = 16.dp)
             ) {
                 Text("중복 확인", color = TextDark, fontSize = 12.sp)
             }
@@ -476,21 +534,28 @@ fun EditProfileContent(
 
         OutlinedTextField(
             value = bio,
-            onValueChange = { bio = it },
-            label = { Text("소개글") },
+            onValueChange = {
+                if (it.length <= 30) bio = it
+            },
+            label = { Text("소개글 (최대 30자)") },
+            supportingText = {
+                Text(
+                    text = "${bio.length}/30자",
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                    fontSize = 10.sp,
+                    color = Color.Gray
+                )
+            },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(100.dp)
+                .height(120.dp)
         )
     }
 }
 
 /**
  * 작성한 글 / 좋아요한 글의 실제 PostData 목록을 보여주는 컴포저블
- *
- * @param title 목록 화면 제목
- * @param posts 게시글 리스트
- * @param onBack 뒤로가기 콜백
  */
 @Composable
 fun SimplePostListContent(
@@ -548,11 +613,6 @@ fun SimplePostListContent(
 
 /**
  * 푸시 알림 수신 여부를 설정하는 화면 컴포저블
- *
- * @param profile 사용자 프로필 및 알림 설정 데이터
- * @param onBack 뒤로가기 콜백
- * @param onToggleComment 댓글 알림 토글 콜백
- * @param onToggleLike 좋아요 알림 토글 콜백
  */
 @Composable
 fun NotificationSettingsContent(
@@ -624,9 +684,6 @@ fun NotificationSettingsContent(
 
 /**
  * 회원 탈퇴 안내 및 최종 동의를 확인하는 팝업 다이얼로그
- *
- * @param onDismiss 다이얼로그 닫기 콜백
- * @param onConfirmDelete 회원 탈퇴 확정 콜백
  */
 @Composable
 fun DeleteAccountDialog(

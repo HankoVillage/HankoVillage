@@ -1,6 +1,8 @@
 package com.konit.hankovillage.ui.community
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -10,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -17,24 +20,21 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
-
-val BgColor = Color(0xFFF7F4EB)
-val CardBg = Color(0xFFEFECE1)
-val PointOrange = Color(0xFFD36D33)
-val TextDark = Color(0xFF332D29)
+import com.konit.hankovillage.ui.pattern.UriImage
+import com.konit.hankovillage.ui.theme.BgColor
+import com.konit.hankovillage.ui.theme.CardBg
+import com.konit.hankovillage.ui.theme.PointOrange
+import com.konit.hankovillage.ui.theme.TextDark
 
 /**
  * 커뮤니티 메인 화면 컴포저블
- *
- * @param postList 전체 커뮤니티 게시글 목록 데이터 (StateList)
- * @param isLoggedIn 사용자 로그인 상태 여부
- * @param currentNickname 현재 로그인한 사용자의 닉네임
- * @param onRequireLogin 비회원 기능 제한 시 로그인 화면으로 이동하는 콜백
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,27 +44,6 @@ fun CommunityScreen(
     currentNickname: String = "김뜨개",
     onRequireLogin: () -> Unit = {}
 ) {
-    LaunchedEffect(Unit) {
-        if (postList.isEmpty()) {
-            postList.add(
-                PostData(
-                    id = 1L,
-                    title = "이번에 완성한 대바늘 꽈배기 니트 뽐냅니다!",
-                    category = CommunityCategory.SHOWOFF,
-                    authorName = currentNickname,
-                    createdAt = "2026-10-10",
-                    content = "3주 동안 도안 보면서 열공해서 만들었어요! 생각보다 핏이 너무 예쁘게 나와서 만족스럽습니다.",
-                    likeCount = 12,
-                    comments = mutableListOf(
-                        CommentData(101L, "뜨개장인", "와 너무 예뻐요! 어떤 실 쓰셨나요?", "2026-10-10 14:20"),
-                        CommentData(102L, currentNickname, "메리노울 100g 4.0mm 바늘 썼습니다!", "2026-10-10 14:35", isMyComment = true)
-                    ),
-                    isMyPost = true
-                )
-            )
-        }
-    }
-
     var selectedCategory by remember { mutableStateOf(CommunityCategory.ALL) }
     var searchQuery by remember { mutableStateOf("") }
 
@@ -105,6 +84,7 @@ fun CommunityScreen(
         } else {
             PostDetailContent(
                 post = selectedPost!!,
+                postList = postList,
                 isLoggedIn = isLoggedIn,
                 currentNickname = currentNickname,
                 onBack = { selectedPost = null },
@@ -236,10 +216,7 @@ fun CommunityScreen(
 }
 
 /**
- * 게시글 목록 아이템 카드를 표시하는 컴포저블
- *
- * @param post 카드에 표시할 게시글 데이터
- * @param onClick 게시글 카드 선택 시 실행할 콜백
+ * 게시글 목록 아이템 카드 (사진이 있을 때만 우측에 1:1로 노출)
  */
 @Composable
 fun PostCardItem(
@@ -298,13 +275,16 @@ fun PostCardItem(
                 }
             }
 
-            Box(
-                modifier = Modifier
-                    .size(70.dp)
-                    .background(Color(0xFFDCD7C9), shape = RoundedCornerShape(8.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("사진", fontSize = 10.sp, color = Color.Gray)
+            if (!post.imageUrl.isNullOrEmpty()) {
+                UriImage(
+                    uriString = post.imageUrl!!,
+                    contentDescription = post.title,
+                    modifier = Modifier
+                        .size(70.dp)
+                        .aspectRatio(1f)
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop
+                )
             }
         }
     }
@@ -312,18 +292,11 @@ fun PostCardItem(
 
 /**
  * 게시글 상세 내용 조회 및 댓글 관리를 제공하는 화면 컴포저블
- *
- * @param post 상세 조회할 게시글 데이터
- * @param isLoggedIn 회원 로그인 여부
- * @param currentNickname 현재 로그인 사용자의 닉네임
- * @param onBack 목록 화면 복귀 콜백
- * @param onEdit 게시글 수정 모드 전환 콜백
- * @param onDelete 게시글 삭제 처리 콜백
- * @param onRequireAuth 회원 전용 기능 동작 시 로그인 안내 콜백
  */
 @Composable
 fun PostDetailContent(
     post: PostData,
+    postList: SnapshotStateList<PostData>,
     isLoggedIn: Boolean,
     currentNickname: String,
     onBack: () -> Unit,
@@ -341,8 +314,6 @@ fun PostDetailContent(
 
     var isLiked by remember(post.id) { mutableStateOf(post.isLiked) }
     var likeCount by remember(post.id) { mutableIntStateOf(post.likeCount) }
-
-    val commentsList = remember(post.id) { post.comments.toMutableStateList() }
 
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -407,17 +378,19 @@ fun PostDetailContent(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp)
-                        .background(Color(0xFFDCD7C9), shape = RoundedCornerShape(12.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("게시글 본문 사진", color = Color.Gray)
+                // 본문 사진이 있는 경우에만 표시
+                if (!post.imageUrl.isNullOrEmpty()) {
+                    UriImage(
+                        uriString = post.imageUrl!!,
+                        contentDescription = post.title,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(240.dp)
+                            .clip(RoundedCornerShape(12.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
-
-                Spacer(modifier = Modifier.height(12.dp))
 
                 val displayContent = if (!isLoggedIn && post.content.length > 100) {
                     post.content.take(100) + "...\n\n나머지 본문과 댓글은 로그인 후 볼 수 있습니다."
@@ -432,15 +405,16 @@ fun PostDetailContent(
                         if (!isLoggedIn) {
                             onRequireAuth()
                         } else {
-                            isLiked = !isLiked
-                            if (isLiked) {
-                                likeCount++
-                                post.isLiked = true
-                                post.likeCount++
-                            } else {
-                                likeCount--
-                                post.isLiked = false
-                                post.likeCount--
+                            val nextLiked = !isLiked
+                            val nextCount = if (nextLiked) likeCount + 1 else (likeCount - 1).coerceAtLeast(0)
+
+                            isLiked = nextLiked
+                            likeCount = nextCount
+
+                            val updatedPost = post.copy(isLiked = nextLiked, likeCount = nextCount)
+                            val idx = postList.indexOfFirst { it.id == post.id }
+                            if (idx != -1) {
+                                postList[idx] = updatedPost
                             }
                         }
                     }) {
@@ -456,7 +430,7 @@ fun PostDetailContent(
                 HorizontalDivider(color = Color.LightGray)
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Text("댓글 목록 (${commentsList.size})", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextDark)
+                Text("댓글 목록 (${post.comments.size})", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextDark)
             }
 
             if (!isLoggedIn) {
@@ -464,7 +438,7 @@ fun PostDetailContent(
                     Text("로그인 후 댓글을 확인해 보세요.", color = Color.Gray, fontSize = 13.sp)
                 }
             } else {
-                items(commentsList, key = { it.id }) { comment ->
+                items(post.comments, key = { it.id }) { comment ->
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = CardBg),
@@ -496,7 +470,15 @@ fun PostDetailContent(
                                     TextButton(
                                         onClick = {
                                             if (commentToEditContent.isNotBlank()) {
-                                                comment.content = commentToEditContent.trim()
+                                                val updatedComments = post.comments.map {
+                                                    if (it.id == comment.id) it.copy(content = commentToEditContent.trim()) else it
+                                                }.toMutableList()
+
+                                                val updatedPost = post.copy(comments = updatedComments)
+                                                val idx = postList.indexOfFirst { it.id == post.id }
+                                                if (idx != -1) {
+                                                    postList[idx] = updatedPost
+                                                }
                                                 editingCommentId = null
                                             }
                                         },
@@ -567,16 +549,23 @@ fun PostDetailContent(
                             val newComment = CommentData(
                                 id = System.currentTimeMillis(),
                                 authorName = currentNickname,
-                                content = newCommentText,
+                                content = newCommentText.trim(),
                                 createdAt = "방금 전",
                                 isMyComment = true
                             )
-                            commentsList.add(newComment)
-                            post.comments.add(newComment)
+
+                            val updatedComments = post.comments.toMutableList().apply { add(newComment) }
+                            val updatedPost = post.copy(comments = updatedComments)
+
+                            val idx = postList.indexOfFirst { it.id == post.id }
+                            if (idx != -1) {
+                                postList[idx] = updatedPost
+                            }
+
                             newCommentText = ""
                             coroutineScope.launch {
-                                if (post.comments.isNotEmpty()) {
-                                    listState.animateScrollToItem(post.comments.size)
+                                if (updatedComments.isNotEmpty()) {
+                                    listState.animateScrollToItem(updatedComments.size)
                                 }
                             }
                         }
@@ -618,8 +607,13 @@ fun PostDetailContent(
             confirmButton = {
                 Button(
                     onClick = {
-                        commentsList.removeIf { it.id == commentToDeleteId }
-                        post.comments.removeIf { it.id == commentToDeleteId }
+                        val updatedComments = post.comments.filterNot { it.id == commentToDeleteId }.toMutableList()
+                        val updatedPost = post.copy(comments = updatedComments)
+
+                        val idx = postList.indexOfFirst { it.id == post.id }
+                        if (idx != -1) {
+                            postList[idx] = updatedPost
+                        }
                         commentToDeleteId = null
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
@@ -633,12 +627,7 @@ fun PostDetailContent(
 }
 
 /**
- * 게시글 신규 등록 및 수정을 위한 입력 양식 컴포저블
- *
- * @param initialPost 수정 시 전달할 기존 게시글 객체 (신규 생성 시 null)
- * @param currentNickname 현재 로그인 사용자의 닉네임
- * @param onBack 화면 이탈 콜백
- * @param onSave 게시글 작성/수정 저장 콜백
+ * 게시글 신규 등록 및 수정 폼 (서버 422 방지를 위한 제목/내용 글자 수 제한 및 키보드 자동 스크롤 적용)
  */
 @Composable
 fun PostFormContent(
@@ -650,12 +639,23 @@ fun PostFormContent(
     var title by remember { mutableStateOf(initialPost?.title ?: "") }
     var selectedCategory by remember { mutableStateOf(initialPost?.category ?: CommunityCategory.SHOWOFF) }
     var content by remember { mutableStateOf(initialPost?.content ?: "") }
+    var imageUrl by remember { mutableStateOf(initialPost?.imageUrl) }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { imageUrl = it.toString() }
+    }
+
+    val scrollState = rememberScrollState()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(BgColor)
-            .padding(16.dp),
+            .padding(16.dp)
+            .verticalScroll(scrollState)
+            .imePadding(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Row(
@@ -673,7 +673,8 @@ fun PostFormContent(
                         val result = initialPost?.copy(
                             title = title,
                             category = selectedCategory,
-                            content = content
+                            content = content,
+                            imageUrl = imageUrl
                         ) ?: PostData(
                             id = System.currentTimeMillis(),
                             title = title,
@@ -681,6 +682,7 @@ fun PostFormContent(
                             authorName = currentNickname,
                             createdAt = "방금 전",
                             content = content,
+                            imageUrl = imageUrl,
                             isMyPost = true
                         )
                         onSave(result)
@@ -706,36 +708,88 @@ fun PostFormContent(
 
         OutlinedTextField(
             value = title,
-            onValueChange = { title = it },
-            label = { Text("제목") },
+            onValueChange = {
+                if (it.length <= 100) title = it
+            },
+            label = { Text("제목 (최대 100자)") },
+            supportingText = {
+                Text(
+                    text = "${title.length}/100자",
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                    fontSize = 10.sp,
+                    color = Color.Gray
+                )
+            },
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
 
         OutlinedButton(
-            onClick = { },
-            modifier = Modifier.fillMaxWidth()
+            onClick = { galleryLauncher.launch("image/*") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(if (!imageUrl.isNullOrEmpty()) 150.dp else 50.dp),
+            shape = RoundedCornerShape(12.dp)
         ) {
-            Icon(Icons.Default.AddAPhoto, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("대표 사진 1장 선택/촬영")
+            if (!imageUrl.isNullOrEmpty()) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    UriImage(
+                        uriString = imageUrl!!,
+                        contentDescription = "첨부된 사진",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(6.dp),
+                        color = Color.Black.copy(alpha = 0.6f),
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text(
+                            text = "사진 변경",
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.AddAPhoto, contentDescription = null, tint = PointOrange)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("대표 사진 추가 (선택)", fontSize = 13.sp, color = PointOrange)
+                }
+            }
         }
 
         OutlinedTextField(
             value = content,
-            onValueChange = { content = it },
+            onValueChange = {
+                if (it.length <= 1000) content = it
+            },
             label = { Text("내용") },
+            supportingText = {
+                Text(
+                    text = "${content.length}/1000자",
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                    fontSize = 10.sp,
+                    color = Color.Gray
+                )
+            },
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f)
+                .height(250.dp)
         )
     }
 }
 
 /**
  * 게시글 및 댓글 신고 사유 선택 다이얼로그
- *
- * @param onDismiss 다이얼로그 닫기 콜백
  */
 @Composable
 fun ReportDialog(onDismiss: () -> Unit) {

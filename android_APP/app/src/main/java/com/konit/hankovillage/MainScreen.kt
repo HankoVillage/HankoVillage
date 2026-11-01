@@ -36,8 +36,6 @@ import com.konit.hankovillage.ui.profile.ProfileScreen
 import com.konit.hankovillage.ui.yarn.YarnData
 import com.konit.hankovillage.ui.yarn.YarnScreen
 
-private val AppBgColor = Color(0xFFF7F4EB)
-
 /**
  * 하단 네비게이션 바의 탭 메뉴 항목 데이터 모델
  *
@@ -247,6 +245,7 @@ fun MainScreen() {
                     ProfileScreen(
                         userProfile = currentSession.profile,
                         postList = postList,
+                        patternList = patternList,
                         onUpdateProfile = { updatedProfile ->
                             currentUserSession = currentUserSession?.copy(profile = updatedProfile)
                         },
