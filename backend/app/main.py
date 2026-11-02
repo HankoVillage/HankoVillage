@@ -2,6 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.db import get_db
+from app.routers import projects, memos
 
 app = FastAPI()
 
@@ -13,3 +14,5 @@ def health(db: Session = Depends(get_db)):
     except Exception:
         raise HTTPException(status_code=503, detail={"status": "error", "db": "unreachable"})
     return {"status": "ok", "db": "ok"}
+app.include_router(projects.router) 
+app.include_router(memos.router)
