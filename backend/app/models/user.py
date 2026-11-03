@@ -13,7 +13,7 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     nickname: Mapped[str] = mapped_column(String(10), unique=True)
     provider: Mapped[str] = mapped_column(String(10))
-    provider_id: Mapped[str] = mapped_column(String(64))
+    provider_id: Mapped[str] = mapped_column(String(255))
     profile_image_key: Mapped[str | None] = mapped_column(String(255))
     bio: Mapped[str | None] = mapped_column(String(30))
     notify_comment: Mapped[bool] = mapped_column(server_default=text("true"))
