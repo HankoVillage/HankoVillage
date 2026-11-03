@@ -12,9 +12,15 @@ ACCESS_TOKEN_TYP = "access+jwt"
 ACCESS_TOKEN_LIFETIME = timedelta(hours=1)
 REFRESH_TOKEN_LIFETIME = timedelta(days=90)
 REFRESH_TOKEN_BYTES = 32
+SIGNUP_TOKEN_TYP = "signup+jwt"
+SIGNUP_TOKEN_LIFETIME = timedelta(minutes=10)
 
 
 class InvalidAccessToken(Exception):
+    pass
+
+
+class InvalidSignupToken(Exception):
     pass
 
 
@@ -48,6 +54,42 @@ def verify_access_token(token: str) -> tuple[int, uuid.UUID]:
         return int(payload["sub"]), uuid.UUID(payload["sid"])
     except (jwt.InvalidTokenError, ValueError) as exc:
         raise InvalidAccessToken() from exc
+
+
+def create_signup_token(provider: str, provider_id: str) -> str:
+    now = datetime.now(timezone.utc)
+    payload = {
+        "provider": provider,
+        "provider_id": provider_id,
+        "iat": now,
+        "exp": now + SIGNUP_TOKEN_LIFETIME,
+    }
+    return jwt.encode(
+        payload,
+        settings.jwt_signup_secret.get_secret_value(),
+        algorithm=ALGORITHM,
+        headers={"typ": SIGNUP_TOKEN_TYP},
+    )
+
+
+def verify_signup_token(token: str) -> tuple[str, str]:
+    try:
+        decoded = jwt.decode_complete(
+            token,
+            settings.jwt_signup_secret.get_secret_value(),
+            algorithms=[ALGORITHM],
+            options={"require": ["provider", "provider_id", "iat", "exp"]},
+        )
+    except jwt.InvalidTokenError as exc:
+        raise InvalidSignupToken() from exc
+    if decoded["header"].get("typ") != SIGNUP_TOKEN_TYP:
+        raise InvalidSignupToken()
+    payload = decoded["payload"]
+    provider = payload["provider"]
+    provider_id = payload["provider_id"]
+    if not isinstance(provider, str) or not isinstance(provider_id, str) or not provider_id:
+        raise InvalidSignupToken()
+    return provider, provider_id
 
 
 def new_refresh_token() -> str:
