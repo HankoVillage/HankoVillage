@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     jwt_access_secret: SecretStr
     jwt_signup_secret: SecretStr
 
+    kakao_native_app_key: str
+
     @property
     def database_url(self) -> str:
         return (
@@ -35,6 +37,12 @@ class Settings(BaseSettings):
                 raise ValueError(f"{name} is too short (minimum {MIN_SECRET_LENGTH} characters). Generate one with: python3 -c 'import secrets; print(secrets.token_urlsafe(48))'")
         if access == signup:
             raise ValueError("JWT_ACCESS_SECRET and JWT_SIGNUP_SECRET must be different. Replace one of them with a new random value.")
+        return self
+
+    @model_validator(mode="after")
+    def check_kakao_native_app_key(self) -> "Settings":
+        if not self.kakao_native_app_key or self.kakao_native_app_key.startswith(PLACEHOLDER_PREFIX):
+            raise ValueError("KAKAO_NATIVE_APP_KEY is not set. Copy the native app key from Kakao Developers into .env.")
         return self
 
 

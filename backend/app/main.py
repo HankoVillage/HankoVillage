@@ -3,9 +3,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.db import get_db
 from app.errors import ApiError, register_error_handlers
+from app.routers import auth
 
 app = FastAPI()
 register_error_handlers(app)
+app.include_router(auth.router)
+app.include_router(auth.users_router)
 
 
 @app.get("/health")
