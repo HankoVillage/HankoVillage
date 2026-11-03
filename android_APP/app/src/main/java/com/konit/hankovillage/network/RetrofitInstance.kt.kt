@@ -1,11 +1,14 @@
 package com.konit.hankovillage.network
 
+import android.content.Context
 import com.google.gson.GsonBuilder
+import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import kotlin.jvm.java
 
 /**
- * 백엔드 FastAPI 실서버와 통신하기 위한 Retrofit 싱글톤 객체
+ * 백엔드 FastAPI 실서버(https://api.hankovillage.com/) 통신용 Retrofit 싱글톤 객체
  */
 object RetrofitInstance {
 
@@ -15,9 +18,17 @@ object RetrofitInstance {
         .setLenient()
         .create()
 
-    val api: HankoApiService by lazy {
-        Retrofit.Builder()
+    /**
+     * Context를 받아 AuthInterceptor가 부착된 HankoApiService를 반환합니다.
+     */
+    fun getApiService(context: Context): HankoApiService {
+        val okHttpClient = OkHttpClient.Builder()
+            .addInterceptor(AuthInterceptor(context))
+            .build()
+
+        return Retrofit.Builder()
             .baseUrl(BASE_URL)
+            .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
             .create(HankoApiService::class.java)
