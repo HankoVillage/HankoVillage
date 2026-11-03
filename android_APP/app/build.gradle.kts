@@ -57,4 +57,7 @@ dependencies {
     // 2. 하단 탭바 기본 아이콘 부품 (Home, Person, List 등)
     implementation("androidx.compose.material:material-icons-extended") // 화면전환 기능
 //  implementation -> ()안에 부품을 인스톨(적용)해줘! 하는 뜻입니다
+    // 3. 서버 통신 부품 (Retrofit & JSON 변환기)
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
 }
