@@ -59,19 +59,23 @@ def create_project(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """새 프로젝트 카운터 생성 (yarn_id 유효성 검증 및 current_row 지원)"""
+    """새 프로젝트 카운터 생성 (yarn_id 유효성 검증, needle_type 및 status 지원)"""
     if req.yarn_id is not None:
         validate_user_yarn(req.yarn_id, current_user.id, db)
 
     initial_row = getattr(req, "current_row", 0) or 0
+    needle_type_val = getattr(req, "needle_type", "대바늘") or "대바늘"
+    status_val = getattr(req, "status", None) or ("완성" if initial_row >= req.target_row else "진행")
 
     new_project = Project(
         user_id=current_user.id,
         name=req.name,
-        yarn_id=req.yarn_id,
+        needle_type=needle_type_val,
         needle=req.needle,
+        yarn_id=req.yarn_id,
         current_row=initial_row,
         target_row=req.target_row,
+        status=status_val,
         updated_at=datetime.now(timezone.utc)
     )
     db.add(new_project)
@@ -98,30 +102,6 @@ def get_project_detail(
     return project
 
 
-@router.patch("/{project_id}/counter", response_model=ProjectResponse)
-def update_counter(
-    project_id: int,
-    req: ProjectCounterUpdate,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """단수 갱신 (Last-Write-Wins 방식)"""
-    project = db.query(Project).filter(
-        Project.id == project_id,
-        Project.user_id == current_user.id
-    ).first()
-
-    if not project:
-        raise ApiError(404, "PROJECT_NOT_FOUND", "프로젝트를 찾을 수 없어요")
-
-    project.current_row = req.current_row
-    project.updated_at = datetime.now(timezone.utc)
-    
-    db.commit()
-    db.refresh(project)
-    return project
-
-
 @router.patch("/{project_id}", response_model=ProjectResponse)
 def update_project(
     project_id: int,
@@ -129,7 +109,7 @@ def update_project(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """프로젝트 정보(이름, 실, 바늘, 목표 단수) 수정 (yarn_id 검증 포함)"""
+    """프로젝트 정보 수정 (null 전송 시 실 선택 해제 및 목표 단수 삭제 지원)"""
     project = db.query(Project).filter(
         Project.id == project_id,
         Project.user_id == current_user.id
@@ -137,18 +117,25 @@ def update_project(
 
     if not project:
         raise ApiError(404, "PROJECT_NOT_FOUND", "프로젝트를 찾을 수 없어요")
+        
+    update_data = req.model_dump(exclude_unset=True)
 
-    # yarn_id 수정 시 유효성 및 소유권 검증
-    if req.yarn_id is not None:
-        validate_user_yarn(req.yarn_id, current_user.id, db)
-        project.yarn_id = req.yarn_id
-
-    if req.name is not None:
-        project.name = req.name
-    if req.needle is not None:
-        project.needle = req.needle
-    if req.target_row is not None:
-        project.target_row = req.target_row
+    if "yarn_id" in update_data:
+        new_yarn_id = update_data["yarn_id"]
+        if new_yarn_id is not None:
+            validate_user_yarn(new_yarn_id, current_user.id, db)
+        project.yarn_id = new_yarn_id 
+        
+    if "name" in update_data:
+        project.name = update_data["name"]
+    if "needle_type" in update_data:
+        project.needle_type = update_data["needle_type"]
+    if "needle" in update_data:
+        project.needle = update_data["needle"]
+    if "target_row" in update_data:
+        project.target_row = update_data["target_row"]
+    if "status" in update_data:
+        project.status = update_data["status"]
 
     project.updated_at = datetime.now(timezone.utc)
     db.commit()
