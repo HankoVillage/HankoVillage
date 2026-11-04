@@ -5,15 +5,12 @@ import com.google.gson.GsonBuilder
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import kotlin.jvm.java
 
 /**
  * 백엔드 FastAPI 실서버(https://api.hankovillage.com/) 통신용 Retrofit 싱글톤 객체
  */
 object RetrofitInstance {
-
     private const val BASE_URL = "https://api.hankovillage.com/"
-
     private val gson = GsonBuilder()
         .setLenient()
         .create()

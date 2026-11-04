@@ -69,13 +69,13 @@ fun MainScreen() {
         mutableStateListOf(
             ProjectData(
                 id = 1L,
-                title = "가을 머플러",
+                name = "가을 대플러",
                 needleType = "대바늘",
-                yarnAndNeedle = "메리노 울 · 4.0mm",
+                needle = "4.0mm",
                 currentRows = 47,
-                totalRows = 120,
-                status = "진행",
-                memo = "20단마다 무늬 바꾸기"
+                targetRows = 120,
+                status = "진행"
+
             )
         )
     }

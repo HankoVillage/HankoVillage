@@ -52,13 +52,12 @@ fun ProjectListScreen(
                 onClick = {
                     val newProject = ProjectData(
                         id = System.currentTimeMillis(),
-                        title = "새 프로젝트",
+                        name = "새 프로젝트",
                         needleType = "대바늘",
-                        yarnAndNeedle = "실 · 바늘 정보를 입력해 주세요",
+                        needle = "실 · 바늘 정보를 입력해 주세요",
                         currentRows = 0,
-                        totalRows = 100,
-                        status = "진행",
-                        memo = ""
+                        targetRows = 100,
+                        status = "진행"
                     )
                     onAddProject(newProject)
                     onProjectSelect(newProject)
@@ -79,7 +78,12 @@ fun ProjectListScreen(
                     .weight(1f),
                 contentAlignment = Alignment.Center
             ) {
-                Text("등록된 카운터가 없습니다.\n'+ 새 카운터'를 눌러 시작해보세요!", fontSize = 13.sp, color = Color.Gray, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                Text(
+                    text = "등록된 카운터가 없습니다.\n'+ 새 카운터'를 눌러 시작해보세요!",
+                    fontSize = 13.sp,
+                    color = Color.Gray,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
             }
         } else {
             LazyVerticalGrid(
@@ -158,21 +162,21 @@ fun ProjectCardItem(
 
             Column {
                 Text(
-                    text = project.title,
+                    text = project.name,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextDark,
                     maxLines = 1
                 )
                 Text(
-                    text = project.yarnAndNeedle,
+                    text = project.needle ?: "",
                     fontSize = 11.sp,
                     color = Color.Gray,
                     maxLines = 1
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "${project.currentRows} / ${project.totalRows}단",
+                    text = "${project.currentRows} / ${project.targetRows}단",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = PointOrange
@@ -185,7 +189,7 @@ fun ProjectCardItem(
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text("카운터 삭제", fontWeight = FontWeight.Bold) },
-            text = { Text("'${project.title}' 카운터를 완전히 삭제하시겠습니까?") },
+            text = { Text("'${project.name}' 카운터를 완전히 삭제하시겠습니까?") },
             confirmButton = {
                 Button(
                     onClick = {
