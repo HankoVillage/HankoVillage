@@ -102,6 +102,34 @@ def get_project_detail(
     return project
 
 
+@router.patch("/{project_id}/counter", response_model=ProjectResponse)
+def update_project_counter(
+    project_id: int,
+    req: ProjectCounterUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """단수 카운터 실시간 갱신 (PATCH /projects/{id}/counter) - Last-Write-Wins"""
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.user_id == current_user.id
+    ).first()
+
+    if not project:
+        raise ApiError(404, "PROJECT_NOT_FOUND", "프로젝트를 찾을 수 없어요")
+
+    project.current_row = req.current_row
+
+    # 목표 단수 달성 여부에 따라 자동 완성 상태 변경 (선택사항)
+    if project.target_row and project.current_row >= project.target_row:
+        project.status = "완성"
+
+    project.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(project)
+    return project
+
+
 @router.patch("/{project_id}", response_model=ProjectResponse)
 def update_project(
     project_id: int,
