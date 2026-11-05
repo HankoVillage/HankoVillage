@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.result.contract.ActivityResultContract
-import com.konit.hankovillage.ui.util.CropImageContract
 
 /**
  * 이미지 선택 계약 (크래시 유발 외부 CROP 호출 제거)
