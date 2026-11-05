@@ -58,6 +58,7 @@ fun ProjectListScreen(
                         targetRows = 100,
                         status = "진행"
                     )
+                    // 리스트에 추가 및 선택 화면 진입
                     onAddProject(newProject)
                     onProjectSelect(newProject)
                 },

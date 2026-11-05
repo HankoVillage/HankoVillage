@@ -65,17 +65,17 @@ fun MainScreen() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: BottomNavItem.Home.route
 
+    // 백엔드 API 명세와 필드명이 일치하는 ProjectData 목록
     val projectList = remember {
         mutableStateListOf(
             ProjectData(
                 id = 1L,
                 name = "가을 머플러",
                 needleType = "대바늘",
-                needle = "4.0mm",
+                needle = "메리노 울 · 4.0mm",
                 currentRows = 47,
                 targetRows = 120,
                 status = "진행"
-
             )
         )
     }
@@ -245,7 +245,6 @@ fun MainScreen() {
                     ProfileScreen(
                         userProfile = currentSession.profile,
                         postList = postList,
-                        patternList = patternList,
                         onUpdateProfile = { updatedProfile ->
                             currentUserSession = currentUserSession?.copy(profile = updatedProfile)
                         },
