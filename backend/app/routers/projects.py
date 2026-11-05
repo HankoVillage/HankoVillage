@@ -102,6 +102,51 @@ def get_project_detail(
     return project
 
 
+@router.patch("/{project_id}", response_model=ProjectResponse)
+def update_project(
+    project_id: int,
+    req: ProjectUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """프로젝트 정보 수정 (NOT NULL 필드에 null 입력 시 반영 방지 및 500 예방)"""
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.user_id == current_user.id
+    ).first()
+
+    if not project:
+        raise ApiError(404, "PROJECT_NOT_FOUND", "프로젝트를 찾을 수 없어요")
+
+    update_data = req.model_dump(exclude_unset=True)
+
+    # 1. NOT NULL 필드 (name, needle_type, status): None이 아닌 유효한 값일 때만 반영
+    if "name" in update_data and update_data["name"] is not None:
+        project.name = update_data["name"]
+    if "needle_type" in update_data and update_data["needle_type"] is not None:
+        project.needle_type = update_data["needle_type"]
+    if "status" in update_data and update_data["status"] is not None:
+        project.status = update_data["status"]
+
+    # 2. Nullable / Optional 필드 (yarn_id, needle, target_row): null 전송 시 해제 및 삭제 허용
+    if "yarn_id" in update_data:
+        new_yarn_id = update_data["yarn_id"]
+        if new_yarn_id is not None:
+            validate_user_yarn(new_yarn_id, current_user.id, db)
+        project.yarn_id = new_yarn_id
+
+    if "needle" in update_data:
+        project.needle = update_data["needle"]
+
+    if "target_row" in update_data:
+        project.target_row = update_data["target_row"]
+
+    project.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(project)
+    return project
+
+
 @router.patch("/{project_id}/counter", response_model=ProjectResponse)
 def update_project_counter(
     project_id: int,
@@ -109,7 +154,10 @@ def update_project_counter(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """단수 카운터 실시간 갱신 (PATCH /projects/{id}/counter) - Last-Write-Wins"""
+    """
+    단수 카운터 (+/-) 조작 시 단수 갱신
+    (목표 단수 도달 시 자동 status 변경 로직 제거 완료)
+    """
     project = db.query(Project).filter(
         Project.id == project_id,
         Project.user_id == current_user.id
@@ -119,53 +167,8 @@ def update_project_counter(
         raise ApiError(404, "PROJECT_NOT_FOUND", "프로젝트를 찾을 수 없어요")
 
     project.current_row = req.current_row
-
-    # 목표 단수 달성 여부에 따라 자동 완성 상태 변경 (선택사항)
-    if project.target_row and project.current_row >= project.target_row:
-        project.status = "완성"
-
     project.updated_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(project)
-    return project
 
-
-@router.patch("/{project_id}", response_model=ProjectResponse)
-def update_project(
-    project_id: int,
-    req: ProjectUpdate,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """프로젝트 정보 수정 (null 전송 시 실 선택 해제 및 목표 단수 삭제 지원)"""
-    project = db.query(Project).filter(
-        Project.id == project_id,
-        Project.user_id == current_user.id
-    ).first()
-
-    if not project:
-        raise ApiError(404, "PROJECT_NOT_FOUND", "프로젝트를 찾을 수 없어요")
-        
-    update_data = req.model_dump(exclude_unset=True)
-
-    if "yarn_id" in update_data:
-        new_yarn_id = update_data["yarn_id"]
-        if new_yarn_id is not None:
-            validate_user_yarn(new_yarn_id, current_user.id, db)
-        project.yarn_id = new_yarn_id 
-        
-    if "name" in update_data:
-        project.name = update_data["name"]
-    if "needle_type" in update_data:
-        project.needle_type = update_data["needle_type"]
-    if "needle" in update_data:
-        project.needle = update_data["needle"]
-    if "target_row" in update_data:
-        project.target_row = update_data["target_row"]
-    if "status" in update_data:
-        project.status = update_data["status"]
-
-    project.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(project)
     return project
