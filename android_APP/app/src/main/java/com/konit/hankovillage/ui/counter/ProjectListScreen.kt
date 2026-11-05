@@ -17,11 +17,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
-private val BgColor = Color(0xFFF7F4EB)
-private val CardBg = Color(0xFFEFECE1)
-private val TextDark = Color(0xFF332D29)
-private val PointOrange = Color(0xFFD36D33)
+import com.konit.hankovillage.ui.theme.BgColor
+import com.konit.hankovillage.ui.theme.CardBg
+import com.konit.hankovillage.ui.theme.PointOrange
+import com.konit.hankovillage.ui.theme.TextDark
 
 /**
  * 등록된 프로젝트 카운터 목록을 조회하고, 신규 카운터를 추가하거나 선택/삭제하는 화면 컴포저블

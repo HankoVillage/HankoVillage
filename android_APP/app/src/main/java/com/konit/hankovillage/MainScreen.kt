@@ -69,7 +69,7 @@ fun MainScreen() {
         mutableStateListOf(
             ProjectData(
                 id = 1L,
-                name = "가을 대플러",
+                name = "가을 머플러",
                 needleType = "대바늘",
                 needle = "4.0mm",
                 currentRows = 47,
