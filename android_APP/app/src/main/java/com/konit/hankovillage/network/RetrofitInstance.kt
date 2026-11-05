@@ -15,17 +15,23 @@ object RetrofitInstance {
         .setLenient()
         .create()
 
+    private var okHttpClient: OkHttpClient? = null
+
+    @Synchronized
+    private fun getOkHttpClient(context: Context): OkHttpClient {
+        return okHttpClient ?: OkHttpClient.Builder()
+            .addInterceptor(AuthInterceptor(context.applicationContext))
+            .build()
+            .also { okHttpClient = it }
+    }
+
     /**
      * Context를 받아 AuthInterceptor가 부착된 HankoApiService를 반환합니다.
      */
     fun getApiService(context: Context): HankoApiService {
-        val okHttpClient = OkHttpClient.Builder()
-            .addInterceptor(AuthInterceptor(context))
-            .build()
-
         return Retrofit.Builder()
             .baseUrl(BASE_URL)
-            .client(okHttpClient)
+            .client(getOkHttpClient(context))
             .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
             .create(HankoApiService::class.java)
