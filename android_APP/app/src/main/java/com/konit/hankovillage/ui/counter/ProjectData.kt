@@ -1,6 +1,5 @@
 package com.konit.hankovillage.ui.counter
 
-import android.os.Parcelable
 import androidx.compose.runtime.saveable.Saver
 import com.google.gson.annotations.SerializedName
 /**
@@ -34,7 +33,7 @@ data class ProjectData(
 {
 
     fun getNeedleTypeDisplay(): String {
-        return when (needleType) {
+        return when (needleType ?: "knitting") {
             "crochet" -> "코바늘"
             "both" -> "둘 다"
             else -> "대바늘"
