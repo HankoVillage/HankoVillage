@@ -29,7 +29,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.konit.hankovillage.ui.yarn.YarnData
-import com.konit.hankovillage.ui.theme.AppBgColor
 import com.konit.hankovillage.ui.theme.BgColor
 import com.konit.hankovillage.ui.theme.CardBg
 import com.konit.hankovillage.ui.theme.PointOrange
@@ -71,7 +70,7 @@ fun CounterScreen(
     var title by remember(key1 = project.id) { mutableStateOf(project.name) }
     var yarnAndNeedle by remember(key1 = project.id) { mutableStateOf(project.needle ?: "") }
     var currentRows by remember(key1 = project.id) { mutableIntStateOf(project.currentRows) }
-    var totalRows by remember(key1 = project.id) { mutableStateOf(project.targetRows) }
+    var totalRows by remember(key1 = project.id) { mutableStateOf(project.targetRows ?: 100) }
     var status by remember(key1 = project.id) { mutableStateOf(project.status) }
     val memoList = remember { mutableStateListOf<MemoItem>() }
 
@@ -245,10 +244,12 @@ fun CounterScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // 🎯 [수정된 부분] 단수 조작 버튼 (+ / -) 클릭 시 즉시 갱신 및 자동 저장
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // 1. 빼기 버튼 (-)
             Button(
                 onClick = {
                     if (currentRows > 0) {
@@ -263,6 +264,7 @@ fun CounterScreen(
                 Text("—", fontSize = 24.sp, fontWeight = FontWeight.Bold)
             }
 
+            // 2. 더하기 버튼 (+ 한 단)
             Button(
                 onClick = {
                     currentRows++
