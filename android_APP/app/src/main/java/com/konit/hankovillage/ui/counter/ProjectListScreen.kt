@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
@@ -15,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.konit.hankovillage.ui.theme.BgColor
@@ -32,6 +34,8 @@ fun ProjectListScreen(
     onDeleteProject: (ProjectData) -> Unit,
     onProjectSelect: (ProjectData) -> Unit
 ) {
+    var showAddDialog by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -48,20 +52,7 @@ fun ProjectListScreen(
                 Text(text = "작업할 카드를 선택하세요", fontSize = 13.sp, color = Color.Gray)
             }
             Button(
-                onClick = {
-                    val newProject = ProjectData(
-                        id = System.currentTimeMillis(),
-                        name = "새 프로젝트",
-                        needleType = "대바늘",
-                        needle = "실 · 바늘 정보를 입력해 주세요",
-                        currentRows = 0,
-                        targetRows = 100,
-                        status = "진행"
-                    )
-                    // 리스트에 추가 및 선택 화면 진입
-                    onAddProject(newProject)
-                    onProjectSelect(newProject)
-                },
+                onClick = { showAddDialog = true },
                 colors = ButtonDefaults.buttonColors(containerColor = PointOrange),
                 shape = RoundedCornerShape(12.dp)
             ) {
@@ -101,6 +92,99 @@ fun ProjectListScreen(
                 }
             }
         }
+    }
+
+    if (showAddDialog) {
+        var nameInput by remember { mutableStateOf("") }
+        var selectedKoreanNeedle by remember { mutableStateOf("대바늘") }
+        var needleInput by remember { mutableStateOf("") }
+        var targetRowInput by remember { mutableStateOf("100") }
+
+        AlertDialog(
+            onDismissRequest = { showAddDialog = false },
+            title = { Text("새 단수 카운터 추가", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // 1. 작품 이름 (필수: 1~50자)
+                    OutlinedTextField(
+                        value = nameInput,
+                        onValueChange = { if (it.length <= 50) nameInput = it },
+                        label = { Text("작품 이름 (예: 가을 머플러)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Text(
+                        text = "바늘 종류",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Gray
+                    )
+                    val needleOptions = listOf("대바늘", "코바늘", "둘 다")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        needleOptions.forEach { option ->
+                            FilterChip(
+                                selected = (selectedKoreanNeedle == option),
+                                onClick = { selectedKoreanNeedle = option },
+                                label = { Text(option) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = PointOrange,
+                                    selectedLabelColor = Color.White
+                                )
+                            )
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = needleInput,
+                        onValueChange = { if (it.length <= 50) needleInput = it },
+                        label = { Text("실 · 바늘 상세 정보 (예: 메리노울 / 4.0mm)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = targetRowInput,
+                        onValueChange = { targetRowInput = it },
+                        label = { Text("목표 단수") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (nameInput.isNotBlank()) {
+                            val serverNeedleType = ProjectData.toServerNeedleType(selectedKoreanNeedle)
+                            val targetRows = targetRowInput.toIntOrNull() ?: 100
+
+                            val newProject = ProjectData(
+                                id = System.currentTimeMillis(), // 백엔드 생성 통신 시 서버 DB real id로 교체됨
+                                name = nameInput,
+                                needleType = serverNeedleType,
+                                needle = needleInput.ifBlank { null },
+                                currentRows = 0,
+                                targetRows = targetRows,
+                                status = "진행"
+                            )
+
+                            onAddProject(newProject)
+                            showAddDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PointOrange)
+                ) {
+                    Text("추가하기", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddDialog = false }) {
+                    Text("취소", color = Color.Gray)
+                }
+            }
+        )
     }
 }
 
