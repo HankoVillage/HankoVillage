@@ -3,7 +3,7 @@ from typing import Optional
 from datetime import datetime
 
 
-# 1. 프로젝트 생성 요청 스키마 (current_row, needle_type, status 포함)
+# 프로젝트 생성 요청 스키마 (current_row, needle_type, status 포함)
 class ProjectCreate(BaseModel):
     name: str
     needle_type: Optional[str] = "대바늘"
@@ -14,7 +14,7 @@ class ProjectCreate(BaseModel):
     status: Optional[str] = "진행"
 
 
-# 2. 프로젝트 수정 요청 스키마 (PATCH /projects/{id})
+# 프로젝트 수정 요청 스키마 (PATCH /projects/{id})
 class ProjectUpdate(BaseModel):
     name: Optional[str] = None
     needle_type: Optional[str] = None
@@ -24,12 +24,12 @@ class ProjectUpdate(BaseModel):
     status: Optional[str] = None
 
 
-# 3. 카운터 단수 갱신 스키마 (PATCH /projects/{id}/counter)
+# 카운터 단수 갱신 스키마 (PATCH /projects/{id}/counter)
 class ProjectCounterUpdate(BaseModel):
     current_row: int = Field(..., ge=0)
 
 
-# 4. 프로젝트 응답 스키마
+# 프로젝트 응답 스키마
 class ProjectResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
