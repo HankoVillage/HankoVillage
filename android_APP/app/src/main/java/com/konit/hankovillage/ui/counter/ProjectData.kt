@@ -2,6 +2,7 @@ package com.konit.hankovillage.ui.counter
 
 import androidx.compose.runtime.saveable.Saver
 import com.google.gson.annotations.SerializedName
+
 /**
  * 백엔드 FastAPI RESTful API와 1:1 매핑되는 프로젝트(단수 카운터) 데이터 모델
  */
@@ -25,13 +26,12 @@ data class ProjectData(
     var currentRows: Int = 0,
 
     @SerializedName("target_row")
-    var targetRows: Int = 100,
+    var targetRows: Int? = null,
 
     @SerializedName("status")
     var status: String = "진행"
 )
 {
-
     fun getNeedleTypeDisplay(): String {
         return when (needleType ?: "knitting") {
             "crochet" -> "코바늘"
@@ -40,7 +40,7 @@ data class ProjectData(
         }
     }
 
-    companion object {
+    companion object
         fun toServerNeedleType(koreanText: String): String {
             return when (koreanText) {
                 "코바늘" -> "crochet"
@@ -49,7 +49,7 @@ data class ProjectData(
             }
         }
     }
-}
+
 
 /**
  * Nullable ProjectData? 전용 Saver (rememberSaveable 적용)
@@ -77,14 +77,14 @@ val ProjectDataSaver = Saver<ProjectData?, List<Any?>>(
             needle = list[3] as? String,
             yarnId = list[4] as? Int,
             currentRows = list[5] as Int,
-            targetRows = list[6] as Int,
+            targetRows = list[6] as? Int,
             status = list[7] as String
         )
     }
 )
 
 /**
- * PATCH /projects/{id}/counter 요청 전송용 DTO
+ *  PATCH /projects/{id}/counter 요청 전송용 DTO
  */
 data class ProjectCounterUpdateRequest(
     @SerializedName("current_row")
