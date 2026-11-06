@@ -98,7 +98,7 @@ fun ProjectListScreen(
         var nameInput by remember { mutableStateOf("") }
         var selectedKoreanNeedle by remember { mutableStateOf("대바늘") }
         var needleInput by remember { mutableStateOf("") }
-        var targetRowInput by remember { mutableStateOf("100") }
+        var targetRowInput by remember { mutableStateOf("") }
 
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
@@ -114,6 +114,7 @@ fun ProjectListScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
 
+                    // 2. 🧶 바늘 종류 선택 칩 (대바늘 / 코바늘 / 둘 다)
                     Text(
                         text = "바늘 종류",
                         fontSize = 12.sp,
@@ -135,6 +136,7 @@ fun ProjectListScreen(
                         }
                     }
 
+                    // 3. 실 · 바늘 상세 정보 (선택: 50자 이하)
                     OutlinedTextField(
                         value = needleInput,
                         onValueChange = { if (it.length <= 50) needleInput = it },
@@ -143,10 +145,11 @@ fun ProjectListScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
 
+                    // 4. 목표 단수 (선택 사항, Int?)
                     OutlinedTextField(
                         value = targetRowInput,
-                        onValueChange = { targetRowInput = it },
-                        label = { Text("목표 단수") },
+                        onValueChange = { targetRowInput = it.filter { char -> char.isDigit() } },
+                        label = { Text("목표 단수 (선택 사항)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
@@ -157,11 +160,12 @@ fun ProjectListScreen(
                 Button(
                     onClick = {
                         if (nameInput.isNotBlank()) {
+                            // 💡 한글 선택 칩 ➔ 백엔드 영문 코드("knitting", "crochet", "both")로 변환
                             val serverNeedleType = ProjectData.toServerNeedleType(selectedKoreanNeedle)
-                            val targetRows = targetRowInput.toIntOrNull() ?: 100
+                            val targetRows = targetRowInput.toIntOrNull()
 
                             val newProject = ProjectData(
-                                id = System.currentTimeMillis(), // 백엔드 생성 통신 시 서버 DB real id로 교체됨
+                                id = System.currentTimeMillis(), // 💡 API 통신 시 백엔드 DB real id 객체로 대체됨
                                 name = nameInput,
                                 needleType = serverNeedleType,
                                 needle = needleInput.ifBlank { null },
@@ -259,8 +263,9 @@ fun ProjectCardItem(
                     maxLines = 1
                 )
                 Spacer(modifier = Modifier.height(4.dp))
+                val targetText = project.targetRows?.let { "${it}단" } ?: "자율"
                 Text(
-                    text = "${project.currentRows} / ${project.targetRows}단",
+                    text = "${project.currentRows} / $targetText",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = PointOrange

@@ -40,7 +40,7 @@ data class ProjectData(
         }
     }
 
-    companion object
+    companion object {
         fun toServerNeedleType(koreanText: String): String {
             return when (koreanText) {
                 "코바늘" -> "crochet"
@@ -49,6 +49,7 @@ data class ProjectData(
             }
         }
     }
+}
 
 
 /**

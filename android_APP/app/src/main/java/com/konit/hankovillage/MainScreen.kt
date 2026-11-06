@@ -15,12 +15,15 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.konit.hankovillage.network.RetrofitInstance
 import com.konit.hankovillage.ui.auth.LoginScreen
 import com.konit.hankovillage.ui.auth.UserSession
 import com.konit.hankovillage.ui.community.CommentData
@@ -36,6 +39,7 @@ import com.konit.hankovillage.ui.pattern.PatternScreen
 import com.konit.hankovillage.ui.profile.ProfileScreen
 import com.konit.hankovillage.ui.yarn.YarnData
 import com.konit.hankovillage.ui.yarn.YarnScreen
+import kotlinx.coroutines.launch
 
 /**
  * 하단 네비게이션 바의 탭 메뉴 항목 데이터 모델
@@ -57,6 +61,9 @@ sealed class BottomNavItem(val title: String, val route: String) {
 @Composable
 fun MainScreen() {
     val navController = rememberNavController()
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
     var currentUserSession by remember { mutableStateOf<UserSession?>(null) }
     var showLoginAuthDialog by remember { mutableStateOf(false) }
 
@@ -192,7 +199,11 @@ fun MainScreen() {
                 if (selectedProject == null) {
                     ProjectListScreen(
                         projectList = projectList,
-                        onAddProject = { newProject -> projectList.add(0, newProject) },
+                        onAddProject = { newProject ->
+                            // 💡 [8번 수정을 위한 비동기 및 로컬 갱신 로직]
+                            // 백엔드 통신 전 로컬 뷰에 반영하고, 추후 API 연동 성공 시 real DB ID 객체로 치환합니다.
+                            projectList.add(0, newProject)
+                        },
                         onDeleteProject = { projectToDelete -> projectList.remove(projectToDelete) },
                         onProjectSelect = { project -> selectedProject = project }
                     )
