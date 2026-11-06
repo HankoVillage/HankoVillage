@@ -1,49 +1,93 @@
 package com.konit.hankovillage.ui.counter
 
 import androidx.compose.runtime.saveable.Saver
+import com.google.gson.annotations.SerializedName
 
 /**
- * 프로젝트 카운터 데이터 모델
+ * 백엔드 FastAPI RESTful API와 1:1 매핑되는 프로젝트(단수 카운터) 데이터 모델
  */
 data class ProjectData(
-    val id: Long = System.currentTimeMillis(),
-    val title: String,
-    val needleType: String,
-    val yarnAndNeedle: String,
-    val currentRows: Int,
-    val totalRows: Int,
-    val status: String,
-    val memo: String
+    @SerializedName("id")
+    val id: Long = 0,
+
+    @SerializedName("name")
+    var name: String,
+
+    @SerializedName("needle_type")
+    var needleType: String = "knitting",
+
+    @SerializedName("needle")
+    var needle: String? = null,
+
+    @SerializedName("yarn_id")
+    var yarnId: Int? = null,
+
+    @SerializedName("current_row")
+    var currentRows: Int = 0,
+
+    @SerializedName("target_row")
+    var targetRows: Int? = null,
+
+    @SerializedName("status")
+    var status: String = "진행"
 )
+{
+    fun getNeedleTypeDisplay(): String {
+        return when (needleType ?: "knitting") {
+            "crochet" -> "코바늘"
+            "both" -> "둘 다"
+            else -> "대바늘"
+        }
+    }
+
+    companion object {
+        fun toServerNeedleType(koreanText: String): String {
+            return when (koreanText) {
+                "코바늘" -> "crochet"
+                "둘 다" -> "both"
+                else -> "knitting"
+            }
+        }
+    }
+}
+
 
 /**
- * Nullable ProjectData? 전용 Saver (rememberSaveable 타입 에러 완벽 해결)
+ * Nullable ProjectData? 전용 Saver (rememberSaveable 적용)
  */
-val ProjectDataSaver = Saver<ProjectData?, List<Any>>(
+val ProjectDataSaver = Saver<ProjectData?, List<Any?>>(
     save = { project ->
         if (project == null) emptyList()
         else listOf(
             project.id,
-            project.title,
+            project.name,
             project.needleType,
-            project.yarnAndNeedle,
+            project.needle,
+            project.yarnId,
             project.currentRows,
-            project.totalRows,
-            project.status,
-            project.memo
+            project.targetRows,
+            project.status
         )
     },
     restore = { list ->
         if (list.isEmpty()) null
         else ProjectData(
             id = list[0] as Long,
-            title = list[1] as String,
+            name = list[1] as String,
             needleType = list[2] as String,
-            yarnAndNeedle = list[3] as String,
-            currentRows = list[4] as Int,
-            totalRows = list[5] as Int,
-            status = list[6] as String,
-            memo = list[7] as String
+            needle = list[3] as? String,
+            yarnId = list[4] as? Int,
+            currentRows = list[5] as Int,
+            targetRows = list[6] as? Int,
+            status = list[7] as String
         )
     }
+)
+
+/**
+ *  PATCH /projects/{id}/counter 요청 전송용 DTO
+ */
+data class ProjectCounterUpdateRequest(
+    @SerializedName("current_row")
+    val currentRow: Int
 )

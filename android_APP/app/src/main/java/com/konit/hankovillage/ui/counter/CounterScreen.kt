@@ -29,7 +29,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.konit.hankovillage.ui.yarn.YarnData
-import com.konit.hankovillage.ui.theme.AppBgColor
 import com.konit.hankovillage.ui.theme.BgColor
 import com.konit.hankovillage.ui.theme.CardBg
 import com.konit.hankovillage.ui.theme.PointOrange
@@ -68,34 +67,30 @@ fun CounterScreen(
         }
     }
 
-    var title by remember(project.id) { mutableStateOf(project.title) }
-    var yarnAndNeedle by remember(project.id) { mutableStateOf(project.yarnAndNeedle) }
-    var currentRows by remember(project.id) { mutableIntStateOf(project.currentRows) }
-    var totalRows by remember(project.id) { mutableIntStateOf(project.totalRows) }
-    var status by remember(project.id) { mutableStateOf(project.status) } // 진행 / 완료
+    var title by remember(key1 = project.id) { mutableStateOf(project.name) }
+    var yarnAndNeedle by remember(key1 = project.id) { mutableStateOf(project.needle ?: "") }
+    var currentRows by remember(key1 = project.id) { mutableIntStateOf(project.currentRows) }
+    var totalRows by remember(key1 = project.id) { mutableStateOf(project.targetRows ?: 100) }
+    var status by remember(key1 = project.id) { mutableStateOf(project.status) }
     val memoList = remember { mutableStateListOf<MemoItem>() }
 
     LaunchedEffect(project.id) {
         memoList.clear()
-        if (project.memo.isNotBlank()) {
-            memoList.add(MemoItem(count = currentRows, text = project.memo))
-        }
     }
 
     fun saveCurrentProjectState(
-        updatedRows: Int = currentRows,
-        updatedTitle: String = title,
-        updatedYarnAndNeedle: String = yarnAndNeedle,
-        updatedTotalRows: Int = totalRows,
+        updatedName: String = title,
+        updatedNeedle: String? = yarnAndNeedle,
+        updatedCurrentRows: Int = currentRows,
+        updatedTargetRows: Int = totalRows,
         updatedStatus: String = status
     ) {
         val updatedProject = project.copy(
-            title = updatedTitle,
-            yarnAndNeedle = updatedYarnAndNeedle,
-            currentRows = updatedRows,
-            totalRows = updatedTotalRows,
-            status = updatedStatus,
-            memo = memoList.lastOrNull()?.text ?: project.memo
+            name = updatedName,
+            needle = updatedNeedle,
+            currentRows = updatedCurrentRows,
+            targetRows = updatedTargetRows,
+            status = updatedStatus
         )
         onSaveProject(updatedProject)
     }
@@ -249,15 +244,17 @@ fun CounterScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // 🎯 [수정된 부분] 단수 조작 버튼 (+ / -) 클릭 시 즉시 갱신 및 자동 저장
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // 1. 빼기 버튼 (-)
             Button(
                 onClick = {
                     if (currentRows > 0) {
                         currentRows--
-                        saveCurrentProjectState(updatedRows = currentRows)
+                        saveCurrentProjectState(updatedCurrentRows = currentRows)
                     }
                 },
                 modifier = Modifier.weight(1f).height(60.dp),
@@ -267,10 +264,11 @@ fun CounterScreen(
                 Text("—", fontSize = 24.sp, fontWeight = FontWeight.Bold)
             }
 
+            // 2. 더하기 버튼 (+ 한 단)
             Button(
                 onClick = {
                     currentRows++
-                    saveCurrentProjectState(updatedRows = currentRows)
+                    saveCurrentProjectState(updatedCurrentRows = currentRows)
                 },
                 modifier = Modifier.weight(2f).height(60.dp),
                 shape = RoundedCornerShape(16.dp),
@@ -581,7 +579,7 @@ fun CounterScreen(
                 Button(
                     onClick = {
                         currentRows = 0
-                        saveCurrentProjectState(updatedRows = 0)
+                        saveCurrentProjectState(updatedCurrentRows = 0)
                         showResetDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = PointOrange)
@@ -704,10 +702,10 @@ fun CounterScreen(
                         status = editStatus
 
                         saveCurrentProjectState(
-                            updatedTitle = title,
-                            updatedYarnAndNeedle = yarnAndNeedle,
-                            updatedRows = currentRows,
-                            updatedTotalRows = totalRows,
+                            updatedName = title,
+                            updatedNeedle = yarnAndNeedle,
+                            updatedCurrentRows = currentRows,
+                            updatedTargetRows = totalRows,
                             updatedStatus = status
                         )
 

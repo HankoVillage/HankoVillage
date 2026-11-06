@@ -2,6 +2,7 @@ package com.konit.hankovillage
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.List
@@ -14,12 +15,15 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.konit.hankovillage.network.RetrofitInstance
 import com.konit.hankovillage.ui.auth.LoginScreen
 import com.konit.hankovillage.ui.auth.UserSession
 import com.konit.hankovillage.ui.community.CommentData
@@ -35,12 +39,10 @@ import com.konit.hankovillage.ui.pattern.PatternScreen
 import com.konit.hankovillage.ui.profile.ProfileScreen
 import com.konit.hankovillage.ui.yarn.YarnData
 import com.konit.hankovillage.ui.yarn.YarnScreen
+import kotlinx.coroutines.launch
 
 /**
  * 하단 네비게이션 바의 탭 메뉴 항목 데이터 모델
- *
- * @property title 탭에 표시될 텍스트
- * @property route 네비게이션 라우팅 경로
  */
 sealed class BottomNavItem(val title: String, val route: String) {
     object Home : BottomNavItem("단수카운터", "home")
@@ -59,6 +61,9 @@ sealed class BottomNavItem(val title: String, val route: String) {
 @Composable
 fun MainScreen() {
     val navController = rememberNavController()
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
     var currentUserSession by remember { mutableStateOf<UserSession?>(null) }
     var showLoginAuthDialog by remember { mutableStateOf(false) }
 
@@ -69,13 +74,12 @@ fun MainScreen() {
         mutableStateListOf(
             ProjectData(
                 id = 1L,
-                title = "가을 머플러",
-                needleType = "대바늘",
-                yarnAndNeedle = "메리노 울 · 4.0mm",
+                name = "가을 머플러",
+                needleType = "knitting",
+                needle = "메리노 울 · 4.0mm",
                 currentRows = 47,
-                totalRows = 120,
-                status = "진행",
-                memo = "20단마다 무늬 바꾸기"
+                targetRows = 120,
+                status = "진행"
             )
         )
     }
@@ -127,7 +131,9 @@ fun MainScreen() {
         containerColor = appBgColor,
         bottomBar = {
             NavigationBar(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(90.dp),
                 containerColor = appBgColor,
                 windowInsets = NavigationBarDefaults.windowInsets
             ) {
@@ -144,7 +150,6 @@ fun MainScreen() {
                         selected = currentRoute == item.route,
                         onClick = {
                             val isLoggedIn = currentUserSession != null
-
                             if (!isLoggedIn && (item == BottomNavItem.Pattern || item == BottomNavItem.Yarn)) {
                                 showLoginAuthDialog = true
                             } else {
@@ -194,7 +199,11 @@ fun MainScreen() {
                 if (selectedProject == null) {
                     ProjectListScreen(
                         projectList = projectList,
-                        onAddProject = { newProject -> projectList.add(0, newProject) },
+                        onAddProject = { newProject ->
+                            // 💡 [8번 수정을 위한 비동기 및 로컬 갱신 로직]
+                            // 백엔드 통신 전 로컬 뷰에 반영하고, 추후 API 연동 성공 시 real DB ID 객체로 치환합니다.
+                            projectList.add(0, newProject)
+                        },
                         onDeleteProject = { projectToDelete -> projectList.remove(projectToDelete) },
                         onProjectSelect = { project -> selectedProject = project }
                     )
