@@ -109,7 +109,6 @@ def update_project(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """프로젝트 정보 수정 (NOT NULL 필드에 null 입력 시 반영 방지 및 500 예방)"""
     project = db.query(Project).filter(
         Project.id == project_id,
         Project.user_id == current_user.id
@@ -120,7 +119,6 @@ def update_project(
 
     update_data = req.model_dump(exclude_unset=True)
 
-    # 1. NOT NULL 필드 (name, needle_type, status): None이 아닌 유효한 값일 때만 반영
     if "name" in update_data and update_data["name"] is not None:
         project.name = update_data["name"]
     if "needle_type" in update_data and update_data["needle_type"] is not None:
@@ -128,7 +126,6 @@ def update_project(
     if "status" in update_data and update_data["status"] is not None:
         project.status = update_data["status"]
 
-    # 2. Nullable / Optional 필드 (yarn_id, needle, target_row): null 전송 시 해제 및 삭제 허용
     if "yarn_id" in update_data:
         new_yarn_id = update_data["yarn_id"]
         if new_yarn_id is not None:
@@ -145,7 +142,6 @@ def update_project(
     db.commit()
     db.refresh(project)
     return project
-
 
 @router.patch("/{project_id}/counter", response_model=ProjectResponse)
 def update_project_counter(
