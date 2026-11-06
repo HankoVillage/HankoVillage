@@ -2,6 +2,7 @@ package com.konit.hankovillage
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.List
@@ -38,9 +39,6 @@ import com.konit.hankovillage.ui.yarn.YarnScreen
 
 /**
  * 하단 네비게이션 바의 탭 메뉴 항목 데이터 모델
- *
- * @property title 탭에 표시될 텍스트
- * @property route 네비게이션 라우팅 경로
  */
 sealed class BottomNavItem(val title: String, val route: String) {
     object Home : BottomNavItem("단수카운터", "home")
@@ -65,13 +63,12 @@ fun MainScreen() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: BottomNavItem.Home.route
 
-    // 백엔드 API 명세와 필드명이 일치하는 ProjectData 목록
     val projectList = remember {
         mutableStateListOf(
             ProjectData(
                 id = 1L,
                 name = "가을 머플러",
-                needleType = "대바늘",
+                needleType = "knitting",
                 needle = "메리노 울 · 4.0mm",
                 currentRows = 47,
                 targetRows = 120,
@@ -127,7 +124,9 @@ fun MainScreen() {
         containerColor = appBgColor,
         bottomBar = {
             NavigationBar(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(90.dp),
                 containerColor = appBgColor,
                 windowInsets = NavigationBarDefaults.windowInsets
             ) {
@@ -144,7 +143,6 @@ fun MainScreen() {
                         selected = currentRoute == item.route,
                         onClick = {
                             val isLoggedIn = currentUserSession != null
-
                             if (!isLoggedIn && (item == BottomNavItem.Pattern || item == BottomNavItem.Yarn)) {
                                 showLoginAuthDialog = true
                             } else {
