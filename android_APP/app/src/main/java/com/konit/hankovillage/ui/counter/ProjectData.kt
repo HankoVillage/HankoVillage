@@ -1,20 +1,8 @@
 package com.konit.hankovillage.ui.counter
 
-import androidx.compose.runtime.saveable.Saver
 import com.google.gson.annotations.SerializedName
+import androidx.compose.runtime.saveable.Saver
 
-/**
- * 백엔드 RESTful API와 1:1 매핑되는 뜨개질 프로젝트 데이터 모델입니다.
- *
- * @property id 프로젝트 식별자
- * @property name 프로젝트 명칭
- * @property needleType 바늘 종류 코드 ("knitting", "crochet", "both")
- * @property needle 사용 실 및 바늘 정보
- * @property yarnId 연동된 실 ID
- * @property currentRows 현재 진행 단수
- * @property targetRows 목표 단수 (null인 경우 목표 없음)
- * @property status 진행 상태 코드 ("in_progress", "done")
- */
 data class ProjectData(
     @SerializedName("id")
     val id: Long = 0,
@@ -38,11 +26,11 @@ data class ProjectData(
     var targetRows: Int? = null,
 
     @SerializedName("status")
-    var status: String = "in_progress"
+    var status: String = "in_progress",
+
+    @SerializedName("memo")
+    var memo: String = ""
 ) {
-    /**
-     * DB 바늘 종류 코드 값을 화면에 노출할 한글 명칭으로 변환합니다.
-     */
     fun getNeedleTypeDisplay(): String {
         return when (needleType) {
             "crochet" -> "코바늘"
@@ -51,9 +39,6 @@ data class ProjectData(
         }
     }
 
-    /**
-     * DB 상태 코드 값을 화면에 노출할 한글 명칭으로 변환합니다.
-     */
     fun getStatusDisplay(): String {
         return when (status) {
             "done" -> "완성"
@@ -62,9 +47,6 @@ data class ProjectData(
     }
 
     companion object {
-        /**
-         * UI에서 선택한 한글 바늘 종류를 서버 전달용 코드 값으로 변환합니다.
-         */
         fun toServerNeedleType(koreanText: String): String {
             return when (koreanText) {
                 "코바늘" -> "crochet"
@@ -73,9 +55,6 @@ data class ProjectData(
             }
         }
 
-        /**
-         * UI에서 선택한 한글 상태를 서버 전달용 코드 값으로 변환합니다.
-         */
         fun toServerStatus(koreanText: String): String {
             return when (koreanText) {
                 "완성", "완료" -> "done"
@@ -84,10 +63,10 @@ data class ProjectData(
         }
     }
 }
-
-/**
- * [ProjectData]의 Nullable 객체 재구성을 위한 Composable State Saver입니다.
- */
+data class ProjectCounterUpdateRequest(
+    @SerializedName("current_row")
+    val currentRow: Int
+)
 val ProjectDataSaver = Saver<ProjectData?, List<Any?>>(
     save = { project ->
         if (project == null) emptyList()
@@ -115,14 +94,4 @@ val ProjectDataSaver = Saver<ProjectData?, List<Any?>>(
             status = list[7] as String
         )
     }
-)
-
-/**
- * 서버에 현재 단수 업데이트를 요청할 때 사용하는 데이터 전송 객체(DTO)입니다.
- *
- * @property currentRow 변경할 현재 단수
- */
-data class ProjectCounterUpdateRequest(
-    @SerializedName("current_row")
-    val currentRow: Int
 )

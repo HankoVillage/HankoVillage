@@ -1,5 +1,6 @@
 package com.konit.hankovillage.ui.profile
 
+import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -35,6 +36,7 @@ import com.konit.hankovillage.ui.theme.BgColor
 import com.konit.hankovillage.ui.theme.CardBg
 import com.konit.hankovillage.ui.theme.PointOrange
 import com.konit.hankovillage.ui.theme.TextDark
+import com.konit.hankovillage.ui.util.ImageCropDialog
 
 /**
  * 마이페이지 내 세부 서브 화면 이동을 위한 내비게이션 상태 정의
@@ -415,7 +417,7 @@ fun ProfileMenuItem(
 }
 
 /**
- * 프로필 수정 화면 컴포저블
+ * 프로필 수정 화면 컴포저블 (1:1 이미지 크롭 연동)
  */
 @Composable
 fun EditProfileContent(
@@ -429,10 +431,24 @@ fun EditProfileContent(
     var profileImageUri by remember { mutableStateOf(profile.profileImageUri) }
     var isCheckedNickname by remember { mutableStateOf(true) }
 
+    // 1:1 크롭 다이얼로그 상태 및 갤러리 런처
+    var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
+
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
-        uri?.let { profileImageUri = it.toString() }
+        uri?.let { pendingCropUri = it }
+    }
+
+    if (pendingCropUri != null) {
+        ImageCropDialog(
+            imageUri = pendingCropUri!!,
+            onDismiss = { pendingCropUri = null },
+            onCropComplete = { croppedUri ->
+                profileImageUri = croppedUri.toString()
+                pendingCropUri = null
+            }
+        )
     }
 
     Column(

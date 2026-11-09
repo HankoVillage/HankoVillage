@@ -39,6 +39,7 @@ import com.konit.hankovillage.ui.theme.BgColor
 import com.konit.hankovillage.ui.theme.CardBg
 import com.konit.hankovillage.ui.theme.PointOrange
 import com.konit.hankovillage.ui.theme.TextDark
+import com.konit.hankovillage.ui.util.ImageCropDialog
 
 val AvailableTags = listOf("의류", "목도리", "모자", "가방", "인형", "기타")
 
@@ -354,7 +355,7 @@ fun PatternCardItem(
 }
 
 /**
- * 도안 상세 보기 화면 (사진 선택 시 바로 반영)
+ * 도안 상세 보기 화면 (1:1 크롭 다이얼로그 연동)
  */
 @Composable
 fun PatternDetailContent(
@@ -366,14 +367,24 @@ fun PatternDetailContent(
     val context = LocalContext.current
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
+    var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
 
     val detailGalleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
-        uri?.let {
-            onUpdate(pattern.copy(imageUrl = it.toString()))
-            Toast.makeText(context, "사진이 등록되었습니다.", Toast.LENGTH_SHORT).show()
-        }
+        uri?.let { pendingCropUri = it }
+    }
+
+    if (pendingCropUri != null) {
+        ImageCropDialog(
+            imageUri = pendingCropUri!!,
+            onDismiss = { pendingCropUri = null },
+            onCropComplete = { croppedUri ->
+                onUpdate(pattern.copy(imageUrl = croppedUri.toString()))
+                pendingCropUri = null
+                Toast.makeText(context, "사진이 등록되었습니다.", Toast.LENGTH_SHORT).show()
+            }
+        )
     }
 
     Column(
@@ -614,23 +625,35 @@ fun PatternDetailContent(
 }
 
 /**
- * 신규 도안 등록 다이얼로그 (서버 422 방지를 위한 제목/실 정보 글자 수 제한 적용)
+ * 신규 도안 등록 다이얼로그 (1:1 크롭 다이얼로그 연동)
  */
 @Composable
 fun PatternUploadDialog(
     onDismiss: () -> Unit,
     onConfirm: (PatternData) -> Unit
 ) {
-    var title by remember { mutableStateOf("") } // 최대 50자 제한
+    var title by remember { mutableStateOf("") }
     var selectedTag by remember { mutableStateOf(AvailableTags.first()) }
-    var yarnInfo by remember { mutableStateOf("") } // 최대 50자 제한
+    var yarnInfo by remember { mutableStateOf("") }
     var patternUrl by remember { mutableStateOf("") }
     var imageUri by remember { mutableStateOf<String?>(null) }
+    var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
-        uri?.let { imageUri = it.toString() }
+        uri?.let { pendingCropUri = it }
+    }
+
+    if (pendingCropUri != null) {
+        ImageCropDialog(
+            imageUri = pendingCropUri!!,
+            onDismiss = { pendingCropUri = null },
+            onCropComplete = { croppedUri ->
+                imageUri = croppedUri.toString()
+                pendingCropUri = null
+            }
+        )
     }
 
     AlertDialog(
@@ -759,7 +782,7 @@ fun PatternUploadDialog(
 }
 
 /**
- * 기존 도안 정보 수정 다이얼로그 (서버 422 방지를 위한 제목/실 정보 글자 수 제한 적용)
+ * 기존 도안 정보 수정 다이얼로그 (1:1 크롭 다이얼로그 연동)
  */
 @Composable
 fun PatternEditDialog(
@@ -772,11 +795,23 @@ fun PatternEditDialog(
     var yarnInfo by remember { mutableStateOf(pattern.yarnInfo) }
     var patternUrl by remember { mutableStateOf(pattern.patternUrl) }
     var imageUri by remember { mutableStateOf(pattern.imageUrl) }
+    var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
-        uri?.let { imageUri = it.toString() }
+        uri?.let { pendingCropUri = it }
+    }
+
+    if (pendingCropUri != null) {
+        ImageCropDialog(
+            imageUri = pendingCropUri!!,
+            onDismiss = { pendingCropUri = null },
+            onCropComplete = { croppedUri ->
+                imageUri = croppedUri.toString()
+                pendingCropUri = null
+            }
+        )
     }
 
     AlertDialog(
