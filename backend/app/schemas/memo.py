@@ -9,8 +9,7 @@ class MemoCreate(BaseModel):
 
 
 class MemoUpdate(BaseModel):
-    content: str = Field(..., min_length=1, max_length=100, description="메모 내용 수정 (1~100자, null 불가 필수)") # 👈 content: str 필수 지정
-
+    content: str = Field(..., min_length=1, max_length=100, description="메모 내용 수정 (1~100자, null 불가 필수)") 
 
 class MemoResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
