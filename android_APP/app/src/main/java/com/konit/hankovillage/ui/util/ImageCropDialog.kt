@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
+import android.media.ExifInterface
 import android.net.Uri
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -33,6 +34,97 @@ import java.io.FileOutputStream
 import kotlin.math.max
 import kotlin.math.roundToInt
 
+/**
+ * URI에서 이미지 크기만 먼저 읽고 inSampleSize로 축소 로드한 뒤, EXIF 회전값을 적용합니다.
+ */
+fun decodeSampledBitmapFromUri(
+    context: Context,
+    uri: Uri,
+    reqWidth: Int = 1024,
+    reqHeight: Int = 1024
+): Bitmap? {
+    return try {
+        // 1. 크기만 먼저 읽기
+        val options = BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+        context.contentResolver.openInputStream(uri)?.use { inputStream ->
+            BitmapFactory.decodeStream(inputStream, null, options)
+        }
+
+        if (options.outWidth <= 0 || options.outHeight <= 0) return null
+
+        // 2. inSampleSize 계산 후 비트맵 디코딩
+        options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight)
+        options.inJustDecodeBounds = false
+
+        val decodedBitmap = context.contentResolver.openInputStream(uri)?.use { inputStream ->
+            BitmapFactory.decodeStream(inputStream, null, options)
+        } ?: return null
+
+        // 3. EXIF 회전 정보 보정
+        rotateImageIfRequired(context, uri, decodedBitmap)
+    } catch (e: Exception) {
+        e.printStackTrace()
+        null
+    }
+}
+
+private fun calculateInSampleSize(
+    options: BitmapFactory.Options,
+    reqWidth: Int,
+    reqHeight: Int
+): Int {
+    val (height: Int, width: Int) = options.outHeight to options.outWidth
+    var inSampleSize = 1
+
+    if (height > reqHeight || width > reqWidth) {
+        val halfHeight: Int = height / 2
+        val halfWidth: Int = width / 2
+
+        while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
+            inSampleSize *= 2
+        }
+    }
+    return inSampleSize
+}
+
+/**
+ * EXIF 메타데이터를 읽어 정상 각도로 비트맵을 회전합니다.
+ */
+private fun rotateImageIfRequired(context: Context, uri: Uri, bitmap: Bitmap): Bitmap {
+    return try {
+        val inputStream = context.contentResolver.openInputStream(uri) ?: return bitmap
+        val ei = ExifInterface(inputStream)
+        val orientation = ei.getAttributeInt(
+            ExifInterface.TAG_ORIENTATION,
+            ExifInterface.ORIENTATION_NORMAL
+        )
+        inputStream.close()
+
+        val degree = when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+            ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+            ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+            else -> 0f
+        }
+
+        if (degree != 0f) {
+            val matrix = Matrix().apply { postRotate(degree) }
+            val rotatedBitmap = Bitmap.createBitmap(
+                bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true
+            )
+            bitmap.recycle() // 기존 비트맵 메모리 해제
+            rotatedBitmap
+        } else {
+            bitmap
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+        bitmap
+    }
+}
+
 @Composable
 fun ImageCropDialog(
     imageUri: Uri,
@@ -41,13 +133,12 @@ fun ImageCropDialog(
 ) {
     val context = LocalContext.current
     val bitmap = remember(imageUri) {
-        try {
-            context.contentResolver.openInputStream(imageUri)?.use {
-                BitmapFactory.decodeStream(it)
-            }
-        } catch (e: Exception) {
-            null
-        }
+        decodeSampledBitmapFromUri(
+            context = context,
+            uri = imageUri,
+            reqWidth = 1024,
+            reqHeight = 1024
+        )
     }
 
     var scale by remember { mutableFloatStateOf(1f) }
@@ -92,7 +183,6 @@ fun ImageCropDialog(
                 }
             }
 
-            // 1:1 정사각형 크롭 영역
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -124,7 +214,6 @@ fun ImageCropDialog(
                     )
                 }
 
-                // 1:1 가이드라인 테두리
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     drawRect(
                         color = Color.White.copy(alpha = 0.8f),
@@ -153,17 +242,16 @@ private fun cropBitmapTo1By1(
         val bw = bitmap.width.toFloat()
         val bh = bitmap.height.toFloat()
 
-        // ContentScale.Crop 기준 초기 배율 계산
         val baseScale = max(boxSize / bw, boxSize / bh)
         val totalScale = baseScale * scale
 
-        // 화면 중앙 기준으로 잘라낼 원본 비트맵 좌표 계산
         val cropSizeInBitmap = boxSize / totalScale
         val centerX = (bw / 2f) - (offset.x / totalScale)
         val centerY = (bh / 2f) - (offset.y / totalScale)
 
         val left = (centerX - cropSizeInBitmap / 2f).coerceIn(0f, bw - 1f).roundToInt()
         val top = (centerY - cropSizeInBitmap / 2f).coerceIn(0f, bh - 1f).roundToInt()
+
         val size = cropSizeInBitmap.roundToInt()
             .coerceAtMost(bitmap.width - left)
             .coerceAtMost(bitmap.height - top)
@@ -186,10 +274,7 @@ private fun cropBitmapTo1By1(
         null
     }
 }
-/**
- * 로컬 크롭 이미지 파일(file://)만 안전하게 삭제
- * (서버 URL https://, 갤러리 원본 content:// 등은 건드리지 않음)
- */
+
 fun deleteCroppedImageFile(context: Context, uriString: String?) {
     if (uriString.isNullOrBlank()) return
     try {
