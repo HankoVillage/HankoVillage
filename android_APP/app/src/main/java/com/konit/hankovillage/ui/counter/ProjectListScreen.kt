@@ -104,7 +104,7 @@ fun ProjectListScreen(
         var nameInput by remember { mutableStateOf("") }
         var selectedKoreanNeedle by remember { mutableStateOf("대바늘") }
         var needleInput by remember { mutableStateOf("") }
-        var selectedYarnId by remember { mutableStateOf<Int?>(null) }
+        var selectedYarnId by remember { mutableStateOf<Long?>(null) }
         var targetRowInput by remember { mutableStateOf("") }
         var showYarnSelectDialog by remember { mutableStateOf(false) }
 
@@ -238,7 +238,7 @@ fun ProjectListScreen(
                                 Card(
                                     onClick = {
                                         needleInput = yarn.name.take(50)
-                                        selectedYarnId = yarn.id.toInt()
+                                        selectedYarnId = yarn.id
                                         showYarnSelectDialog = false
                                     },
                                     colors = CardDefaults.cardColors(containerColor = CardBg),

@@ -17,7 +17,7 @@ data class ProjectData(
     var needle: String? = null,
 
     @SerializedName("yarn_id")
-    var yarnId: Int? = null,
+    var yarnId: Long? = null,
 
     @SerializedName("current_row")
     var currentRows: Int = 0,
@@ -27,9 +27,6 @@ data class ProjectData(
 
     @SerializedName("status")
     var status: String = "in_progress",
-
-    @SerializedName("memo")
-    var memo: String = ""
 ) {
     fun getNeedleTypeDisplay(): String {
         return when (needleType) {
@@ -88,7 +85,7 @@ val ProjectDataSaver = Saver<ProjectData?, List<Any?>>(
             name = list[1] as String,
             needleType = list[2] as String,
             needle = list[3] as? String,
-            yarnId = list[4] as? Int,
+            yarnId = list[4] as? Long,
             currentRows = list[5] as Int,
             targetRows = list[6] as? Int,
             status = list[7] as String

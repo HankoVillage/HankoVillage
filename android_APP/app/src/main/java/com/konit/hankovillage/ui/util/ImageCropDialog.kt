@@ -172,7 +172,11 @@ private fun cropBitmapTo1By1(
         val cropped = Bitmap.createBitmap(bitmap, left, top, size, size)
         val resized = Bitmap.createScaledBitmap(cropped, 800, 800, true)
 
-        val outFile = File(context.cacheDir, "cropped_${System.currentTimeMillis()}.jpg")
+        val croppedDir = File(context.filesDir, "cropped_images").apply {
+            if (!exists()) mkdirs()
+        }
+
+        val outFile = File(croppedDir, "cropped_${System.currentTimeMillis()}.jpg")
         FileOutputStream(outFile).use { out ->
             resized.compress(Bitmap.CompressFormat.JPEG, 85, out)
         }
@@ -180,5 +184,32 @@ private fun cropBitmapTo1By1(
     } catch (e: Exception) {
         e.printStackTrace()
         null
+    }
+}
+/**
+ * 로컬 크롭 이미지 파일(file://)만 안전하게 삭제
+ * (서버 URL https://, 갤러리 원본 content:// 등은 건드리지 않음)
+ */
+fun deleteCroppedImageFile(context: Context, uriString: String?) {
+    if (uriString.isNullOrBlank()) return
+    try {
+        val uri = Uri.parse(uriString)
+        if (uri.scheme != "file") return
+        val path = uri.path ?: return
+        val file = File(path)
+
+        val croppedDirPath = File(context.filesDir, "cropped_images").canonicalPath
+        val cacheDirPath = context.cacheDir.canonicalPath
+        val filePath = file.canonicalPath
+
+        val isManagedCroppedFile =
+            filePath.startsWith(croppedDirPath + File.separator) ||
+                    (filePath.startsWith(cacheDirPath + File.separator) && file.name.startsWith("cropped_"))
+
+        if (isManagedCroppedFile && file.exists()) {
+            file.delete()
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
     }
 }

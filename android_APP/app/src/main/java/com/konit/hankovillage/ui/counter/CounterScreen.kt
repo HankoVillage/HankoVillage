@@ -80,7 +80,7 @@ fun CounterScreen(
         updatedRows: Int = currentRows,
         updatedTitle: String = title,
         updatedYarnAndNeedle: String = yarnAndNeedle,
-        updatedYarnId: Int? = yarnId,
+        updatedYarnId: Long? = yarnId,
         updatedTargetRows: Int? = targetRows,
         updatedStatus: String = status
     ) {
