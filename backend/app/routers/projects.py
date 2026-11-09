@@ -59,23 +59,19 @@ def create_project(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """새 프로젝트 카운터 생성 (yarn_id 유효성 검증, needle_type 및 status 지원)"""
+    """새 프로젝트 카운터 생성"""
     if req.yarn_id is not None:
         validate_user_yarn(req.yarn_id, current_user.id, db)
-
-    initial_row = getattr(req, "current_row", 0) or 0
-    needle_type_val = getattr(req, "needle_type", "대바늘") or "대바늘"
-    status_val = getattr(req, "status", None) or ("완성" if initial_row >= req.target_row else "진행")
 
     new_project = Project(
         user_id=current_user.id,
         name=req.name,
-        needle_type=needle_type_val,
+        needle_type=req.needle_type,
         needle=req.needle,
         yarn_id=req.yarn_id,
-        current_row=initial_row,
+        current_row=req.current_row,
         target_row=req.target_row,
-        status=status_val,
+        status=req.status,
         updated_at=datetime.now(timezone.utc)
     )
     db.add(new_project)
@@ -142,6 +138,7 @@ def update_project(
     db.commit()
     db.refresh(project)
     return project
+
 
 @router.patch("/{project_id}/counter", response_model=ProjectResponse)
 def update_project_counter(
