@@ -40,6 +40,7 @@ import com.konit.hankovillage.ui.theme.CardBg
 import com.konit.hankovillage.ui.theme.PointOrange
 import com.konit.hankovillage.ui.theme.TextDark
 import com.konit.hankovillage.ui.util.ImageCropDialog
+import com.konit.hankovillage.ui.util.deleteCroppedImageFile
 
 val AvailableTags = listOf("의류", "목도리", "모자", "가방", "인형", "기타")
 
@@ -380,9 +381,9 @@ fun PatternDetailContent(
             imageUri = pendingCropUri!!,
             onDismiss = { pendingCropUri = null },
             onCropComplete = { croppedUri ->
+                deleteCroppedImageFile(context, pattern.imageUrl)
                 onUpdate(pattern.copy(imageUrl = croppedUri.toString()))
                 pendingCropUri = null
-                Toast.makeText(context, "사진이 등록되었습니다.", Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -609,7 +610,9 @@ fun PatternDetailContent(
             text = { Text("\"${pattern.title}\" 도안을 정말 삭제하시겠습니까?") },
             confirmButton = {
                 Button(
-                    onClick = { onDelete(pattern.id) },
+                    onClick = {
+                        deleteCroppedImageFile(context, pattern.imageUrl)
+                        onDelete(pattern.id) },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
                 ) {
                     Text("삭제", color = Color.White)
@@ -632,6 +635,7 @@ fun PatternUploadDialog(
     onDismiss: () -> Unit,
     onConfirm: (PatternData) -> Unit
 ) {
+    val context = LocalContext.current
     var title by remember { mutableStateOf("") }
     var selectedTag by remember { mutableStateOf(AvailableTags.first()) }
     var yarnInfo by remember { mutableStateOf("") }
@@ -645,16 +649,23 @@ fun PatternUploadDialog(
         uri?.let { pendingCropUri = it }
     }
 
+    val handleDismiss = {
+        deleteCroppedImageFile(context, imageUri)
+        onDismiss()
+    }
+
     if (pendingCropUri != null) {
         ImageCropDialog(
             imageUri = pendingCropUri!!,
             onDismiss = { pendingCropUri = null },
             onCropComplete = { croppedUri ->
+                deleteCroppedImageFile(context, imageUri)
                 imageUri = croppedUri.toString()
                 pendingCropUri = null
             }
         )
     }
+
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -794,13 +805,22 @@ fun PatternEditDialog(
     var selectedTag by remember { mutableStateOf(pattern.tag) }
     var yarnInfo by remember { mutableStateOf(pattern.yarnInfo) }
     var patternUrl by remember { mutableStateOf(pattern.patternUrl) }
-    var imageUri by remember { mutableStateOf(pattern.imageUrl) }
     var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
-
+    val context = LocalContext.current
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         uri?.let { pendingCropUri = it }
+    }
+
+    val initialImageUri = pattern.imageUrl
+    var imageUri by remember { mutableStateOf(initialImageUri) }
+
+    val handleDismiss = {
+        if (imageUri != initialImageUri) {
+            deleteCroppedImageFile(context, imageUri)
+        }
+        onDismiss()
     }
 
     if (pendingCropUri != null) {
@@ -808,10 +828,17 @@ fun PatternEditDialog(
             imageUri = pendingCropUri!!,
             onDismiss = { pendingCropUri = null },
             onCropComplete = { croppedUri ->
+                if (imageUri != initialImageUri) {
+                    deleteCroppedImageFile(context, imageUri)
+                }
                 imageUri = croppedUri.toString()
                 pendingCropUri = null
             }
         )
+    }
+
+    if (imageUri != initialImageUri) {
+        deleteCroppedImageFile(context, initialImageUri)
     }
 
     AlertDialog(

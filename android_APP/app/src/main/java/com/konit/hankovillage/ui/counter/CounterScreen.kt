@@ -665,7 +665,12 @@ fun CounterScreen(
             title = { Text("카운터 정보 수정", fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("진행 상황", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                    Text(
+                        "진행 상황",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Gray
+                    )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterChip(
                             selected = editStatus == "진행",
@@ -726,7 +731,11 @@ fun CounterScreen(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Icon(Icons.Default.ShoppingBag, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(
+                                Icons.Default.ShoppingBag,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text("실 보관소에서 불러오기", fontSize = 12.sp, color = PointOrange)
                         }
@@ -809,14 +818,19 @@ fun CounterScreen(
                                 Card(
                                     onClick = {
                                         editYarnAndNeedle = yarn.name.take(50)
-                                        editYarnId = yarn.id.toInt()
+                                        editYarnId = yarn.id
                                         showYarnSelectDialog = false
                                     },
                                     colors = CardDefaults.cardColors(containerColor = CardBg),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Column(modifier = Modifier.padding(12.dp)) {
-                                        Text(yarn.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextDark)
+                                        Text(
+                                            yarn.name,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp,
+                                            color = TextDark
+                                        )
                                         if (yarn.color.isNotBlank()) {
                                             Text(yarn.color, fontSize = 11.sp, color = Color.Gray)
                                         }

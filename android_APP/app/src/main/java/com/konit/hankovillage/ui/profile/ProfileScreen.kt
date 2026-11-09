@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -27,7 +28,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
 import com.konit.hankovillage.ui.community.PostData
 import com.konit.hankovillage.ui.pattern.PatternData
 import com.konit.hankovillage.ui.pattern.PatternStatus
@@ -37,6 +37,7 @@ import com.konit.hankovillage.ui.theme.CardBg
 import com.konit.hankovillage.ui.theme.PointOrange
 import com.konit.hankovillage.ui.theme.TextDark
 import com.konit.hankovillage.ui.util.ImageCropDialog
+import com.konit.hankovillage.ui.util.deleteCroppedImageFile
 
 /**
  * 마이페이지 내 세부 서브 화면 이동을 위한 내비게이션 상태 정의
@@ -61,15 +62,21 @@ fun ProfileScreen(
 
     var profile by remember(userProfile) { mutableStateOf(userProfile) }
 
-    val completedWorks = remember(patternList) {
-        patternList.filter { it.status == PatternStatus.COMPLETED }
+    // SnapshotStateList 내부 변경까지 즉시 반영되도록 derivedStateOf 사용
+    val completedWorks by remember(patternList) {
+        derivedStateOf {
+            patternList.filter { it.status == PatternStatus.COMPLETED }
+        }
     }
-    val myPosts = remember(postList, profile.nickname) {
-        postList.filter { it.isMyPost || it.authorName == profile.nickname }
+    val myPosts by remember(postList) {
+        derivedStateOf {
+            postList.filter { it.isMyPost || it.authorName == profile.nickname }
+        }
     }
-
-    val likedPosts = remember(postList) {
-        postList.filter { it.isLiked }
+    val likedPosts by remember(postList) {
+        derivedStateOf {
+            postList.filter { it.isLiked }
+        }
     }
 
     var currentSubScreen by remember {
@@ -85,7 +92,8 @@ fun ProfileScreen(
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showDeleteAccountDialog by remember { mutableStateOf(false) }
 
-    if (currentSubScreen != ProfileSubScreen.NONE) {
+    // EDIT_PROFILE은 내부 BackHandler에서 임시 파일 정리 후 뒤로가기 처리
+    if (currentSubScreen != ProfileSubScreen.NONE && currentSubScreen != ProfileSubScreen.EDIT_PROFILE) {
         BackHandler { currentSubScreen = ProfileSubScreen.NONE }
     }
 
@@ -252,7 +260,7 @@ fun ProfileScreen(
                         Text("아직 완성된 도안이 없어요!", fontSize = 12.sp, color = Color.Gray)
                     }
                 } else {
-                    androidx.compose.foundation.lazy.LazyRow(
+                    LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -381,6 +389,7 @@ fun ProfileScreen(
         DeleteAccountDialog(
             onDismiss = { showDeleteAccountDialog = false },
             onConfirmDelete = {
+                deleteCroppedImageFile(context, profile.profileImageUri)
                 showDeleteAccountDialog = false
                 Toast.makeText(context, "회원 탈퇴가 완료되었습니다.", Toast.LENGTH_SHORT).show()
                 onLogout()
@@ -417,7 +426,7 @@ fun ProfileMenuItem(
 }
 
 /**
- * 프로필 수정 화면 컴포저블 (1:1 이미지 크롭 연동)
+ * 프로필 수정 화면 컴포저블 (1:1 이미지 크롭 및 임시/기존 파일 정리 연동)
  */
 @Composable
 fun EditProfileContent(
@@ -428,10 +437,9 @@ fun EditProfileContent(
     val context = LocalContext.current
     var nickname by remember { mutableStateOf(profile.nickname) }
     var bio by remember { mutableStateOf(profile.bio) }
-    var profileImageUri by remember { mutableStateOf(profile.profileImageUri) }
+    val initialImageUri = remember { profile.profileImageUri }
+    var profileImageUri by remember { mutableStateOf(initialImageUri) }
     var isCheckedNickname by remember { mutableStateOf(true) }
-
-    // 1:1 크롭 다이얼로그 상태 및 갤러리 런처
     var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
 
     val galleryLauncher = rememberLauncherForActivityResult(
@@ -440,11 +448,23 @@ fun EditProfileContent(
         uri?.let { pendingCropUri = it }
     }
 
+    val handleBack = {
+        if (profileImageUri != initialImageUri) {
+            deleteCroppedImageFile(context, profileImageUri)
+        }
+        onBack()
+    }
+
+    BackHandler { handleBack() }
+
     if (pendingCropUri != null) {
         ImageCropDialog(
             imageUri = pendingCropUri!!,
             onDismiss = { pendingCropUri = null },
             onCropComplete = { croppedUri ->
+                if (profileImageUri != initialImageUri) {
+                    deleteCroppedImageFile(context, profileImageUri)
+                }
                 profileImageUri = croppedUri.toString()
                 pendingCropUri = null
             }
@@ -464,16 +484,32 @@ fun EditProfileContent(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextButton(onClick = onBack) {
+            TextButton(onClick = handleBack) {
                 Text("< 취소", color = Color.Gray, fontWeight = FontWeight.Bold)
             }
 
             Button(
                 onClick = {
-                    if (isCheckedNickname && nickname.isNotBlank()) {
-                        onSave(profile.copy(nickname = nickname, bio = bio, profileImageUri = profileImageUri))
-                    } else {
-                        Toast.makeText(context, "닉네임 중복 확인을 해주세요.", Toast.LENGTH_SHORT).show()
+                    val trimmedNickname = nickname.trim()
+                    when {
+                        trimmedNickname.length < 2 -> {
+                            Toast.makeText(context, "닉네임은 2자 이상 입력해주세요.", Toast.LENGTH_SHORT).show()
+                        }
+                        !isCheckedNickname -> {
+                            Toast.makeText(context, "닉네임 중복 확인을 해주세요.", Toast.LENGTH_SHORT).show()
+                        }
+                        else -> {
+                            if (profileImageUri != initialImageUri) {
+                                deleteCroppedImageFile(context, initialImageUri)
+                            }
+                            onSave(
+                                profile.copy(
+                                    nickname = trimmedNickname,
+                                    bio = bio,
+                                    profileImageUri = profileImageUri
+                                )
+                            )
+                        }
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = PointOrange),
@@ -538,8 +574,12 @@ fun EditProfileContent(
 
             Button(
                 onClick = {
-                    isCheckedNickname = true
-                    Toast.makeText(context, "사용 가능한 닉네임입니다.", Toast.LENGTH_SHORT).show()
+                    if (nickname.trim().length < 2) {
+                        Toast.makeText(context, "닉네임은 2자 이상 입력해주세요.", Toast.LENGTH_SHORT).show()
+                    } else {
+                        isCheckedNickname = true
+                        Toast.makeText(context, "사용 가능한 닉네임입니다.", Toast.LENGTH_SHORT).show()
+                    }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = CardBg),
                 modifier = Modifier.padding(bottom = 16.dp)

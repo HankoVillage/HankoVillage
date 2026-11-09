@@ -33,6 +33,7 @@ import com.konit.hankovillage.ui.theme.CardBg
 import com.konit.hankovillage.ui.theme.PointOrange
 import com.konit.hankovillage.ui.theme.TextDark
 import com.konit.hankovillage.ui.util.ImageCropDialog
+import com.konit.hankovillage.ui.util.deleteCroppedImageFile
 
 /**
  * 실 보관소 메인 화면
@@ -229,9 +230,9 @@ fun YarnDetailContent(
             imageUri = pendingCropUri!!,
             onDismiss = { pendingCropUri = null },
             onCropComplete = { croppedUri ->
+                deleteCroppedImageFile(context, yarn.imageUrl)
                 onUpdate(yarn.copy(imageUrl = croppedUri.toString()))
                 pendingCropUri = null
-                Toast.makeText(context, "사진이 등록되었습니다.", Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -387,7 +388,9 @@ fun YarnDetailContent(
         Spacer(modifier = Modifier.weight(1f))
 
         OutlinedButton(
-            onClick = { showDeleteDialog = true },
+            onClick = {
+                deleteCroppedImageFile(context, yarn.imageUrl)
+                showDeleteDialog = true },
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red),
             border = androidx.compose.foundation.BorderStroke(1.dp, Color.Red)
@@ -437,11 +440,12 @@ fun YarnUploadDialog(
     onDismiss: () -> Unit,
     onConfirm: (YarnData) -> Unit
 ) {
-    var name by remember { mutableStateOf("") }         // 최대 50자 제한
-    var color by remember { mutableStateOf("") }        // 최대 30자 제한
-    var shop by remember { mutableStateOf("") }         // 최대 100자 제한
+    val context = LocalContext.current
+    var name by remember { mutableStateOf("") }
+    var color by remember { mutableStateOf("") }
+    var shop by remember { mutableStateOf("") }
     var purchaseDate by remember { mutableStateOf("") }
-    var memo by remember { mutableStateOf("") }         // 최대 100자 제한
+    var memo by remember { mutableStateOf("") }
     var imageUri by remember { mutableStateOf<String?>(null) }
     var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
 
@@ -451,11 +455,17 @@ fun YarnUploadDialog(
         uri?.let { pendingCropUri = it }
     }
 
+    val handleDismiss = {
+        deleteCroppedImageFile(context, imageUri)
+        onDismiss()
+    }
+
     if (pendingCropUri != null) {
         ImageCropDialog(
             imageUri = pendingCropUri!!,
             onDismiss = { pendingCropUri = null },
             onCropComplete = { croppedUri ->
+                deleteCroppedImageFile(context, imageUri)
                 imageUri = croppedUri.toString()
                 pendingCropUri = null
             }
@@ -609,7 +619,7 @@ fun YarnEditDialog(
     var shop by remember { mutableStateOf(yarn.shop) }
     var purchaseDate by remember { mutableStateOf(yarn.purchaseDate) }
     var memo by remember { mutableStateOf(yarn.memo) }
-    var imageUri by remember { mutableStateOf(yarn.imageUrl) }
+    val context = LocalContext.current
     var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
 
     val galleryLauncher = rememberLauncherForActivityResult(
@@ -618,15 +628,31 @@ fun YarnEditDialog(
         uri?.let { pendingCropUri = it }
     }
 
+    val initialImageUri = yarn.imageUrl
+    var imageUri by remember { mutableStateOf(initialImageUri) }
+
+    val handleDismiss = {
+        if (imageUri != initialImageUri) {
+            deleteCroppedImageFile(context, imageUri)
+        }
+        onDismiss() }
+
     if (pendingCropUri != null) {
         ImageCropDialog(
             imageUri = pendingCropUri!!,
             onDismiss = { pendingCropUri = null },
             onCropComplete = { croppedUri ->
+                if (imageUri != initialImageUri) {
+                    deleteCroppedImageFile(context, imageUri)
+                }
                 imageUri = croppedUri.toString()
                 pendingCropUri = null
             }
         )
+    }
+
+    if (imageUri != initialImageUri) {
+        deleteCroppedImageFile(context, initialImageUri)
     }
 
     AlertDialog(
