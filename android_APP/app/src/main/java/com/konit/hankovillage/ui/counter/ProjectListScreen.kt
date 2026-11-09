@@ -105,7 +105,6 @@ fun ProjectListScreen(
             title = { Text("새 단수 카운터 추가", fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    // 1. 작품 이름 (필수: 1~50자)
                     OutlinedTextField(
                         value = nameInput,
                         onValueChange = { if (it.length <= 50) nameInput = it },
@@ -114,7 +113,6 @@ fun ProjectListScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    // 2. 🧶 바늘 종류 선택 칩 (대바늘 / 코바늘 / 둘 다)
                     Text(
                         text = "바늘 종류",
                         fontSize = 12.sp,
@@ -136,7 +134,6 @@ fun ProjectListScreen(
                         }
                     }
 
-                    // 3. 실 · 바늘 상세 정보 (선택: 50자 이하)
                     OutlinedTextField(
                         value = needleInput,
                         onValueChange = { if (it.length <= 50) needleInput = it },
@@ -145,7 +142,6 @@ fun ProjectListScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    // 4. 목표 단수 (선택 사항, Int?)
                     OutlinedTextField(
                         value = targetRowInput,
                         onValueChange = { targetRowInput = it.filter { char -> char.isDigit() } },
@@ -160,12 +156,11 @@ fun ProjectListScreen(
                 Button(
                     onClick = {
                         if (nameInput.isNotBlank()) {
-                            // 💡 한글 선택 칩 ➔ 백엔드 영문 코드("knitting", "crochet", "both")로 변환
                             val serverNeedleType = ProjectData.toServerNeedleType(selectedKoreanNeedle)
                             val targetRows = targetRowInput.toIntOrNull()
 
                             val newProject = ProjectData(
-                                id = System.currentTimeMillis(), // 💡 API 통신 시 백엔드 DB real id 객체로 대체됨
+                                id = System.currentTimeMillis(),
                                 name = nameInput,
                                 needleType = serverNeedleType,
                                 needle = needleInput.ifBlank { null },
