@@ -25,7 +25,7 @@ import com.konit.hankovillage.ui.theme.PointOrange
 import com.konit.hankovillage.ui.theme.TextDark
 
 /**
- * 등록된 프로젝트 카운터 목록을 조회하고, 신규 카운터를 추가하거나 선택/삭제하는 화면 컴포저블
+- 등록된 프로젝트 카운터 목록을 조회하고, 신규 카운터를 추가하거나 선택/삭제하는 화면 컴포저블
  */
 @Composable
 fun ProjectListScreen(
@@ -100,6 +100,9 @@ fun ProjectListScreen(
         var needleInput by remember { mutableStateOf("") }
         var targetRowInput by remember { mutableStateOf("") }
 
+        val parsedTarget = targetRowInput.toIntOrNull()
+        val isTargetInvalid = targetRowInput.isNotBlank() && (parsedTarget == null || parsedTarget < 1)
+
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
             title = { Text("새 단수 카운터 추가", fontWeight = FontWeight.Bold) },
@@ -144,8 +147,13 @@ fun ProjectListScreen(
 
                     OutlinedTextField(
                         value = targetRowInput,
-                        onValueChange = { targetRowInput = it.filter { char -> char.isDigit() } },
-                        label = { Text("목표 단수 (선택 사항)") },
+                        onValueChange = { targetRowInput = it.filter { ch -> ch.isDigit() } },
+                        label = { Text("목표 단수 (선택)") },
+                        placeholder = { Text("1 이상 입력 (미입력 시 목표 없음)") },
+                        isError = isTargetInvalid,
+                        supportingText = if (isTargetInvalid) {
+                            { Text("목표 단수는 1 이상이어야 합니다.", color = MaterialTheme.colorScheme.error) }
+                        } else null,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
@@ -155,9 +163,8 @@ fun ProjectListScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        if (nameInput.isNotBlank()) {
+                        if (nameInput.isNotBlank() && !isTargetInvalid) {
                             val serverNeedleType = ProjectData.toServerNeedleType(selectedKoreanNeedle)
-                            val targetRows = targetRowInput.toIntOrNull()
 
                             val newProject = ProjectData(
                                 id = System.currentTimeMillis(),
@@ -165,7 +172,7 @@ fun ProjectListScreen(
                                 needleType = serverNeedleType,
                                 needle = needleInput.ifBlank { null },
                                 currentRows = 0,
-                                targetRows = targetRows,
+                                targetRows = parsedTarget,
                                 status = "진행"
                             )
 
@@ -173,6 +180,7 @@ fun ProjectListScreen(
                             showAddDialog = false
                         }
                     },
+                    enabled = nameInput.isNotBlank() && !isTargetInvalid,
                     colors = ButtonDefaults.buttonColors(containerColor = PointOrange)
                 ) {
                     Text("추가하기", color = Color.White)
@@ -188,7 +196,7 @@ fun ProjectListScreen(
 }
 
 /**
- * 개별 카운터 카드 항목 컴포저블
+- 개별 카운터 카드 항목 컴포저블
  */
 @Composable
 fun ProjectCardItem(
