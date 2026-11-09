@@ -18,12 +18,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.konit.hankovillage.network.RetrofitInstance
 import com.konit.hankovillage.ui.auth.LoginScreen
 import com.konit.hankovillage.ui.auth.UserSession
 import com.konit.hankovillage.ui.community.CommentData
@@ -39,10 +38,12 @@ import com.konit.hankovillage.ui.pattern.PatternScreen
 import com.konit.hankovillage.ui.profile.ProfileScreen
 import com.konit.hankovillage.ui.yarn.YarnData
 import com.konit.hankovillage.ui.yarn.YarnScreen
-import kotlinx.coroutines.launch
 
 /**
- * 하단 네비게이션 바의 탭 메뉴 항목 데이터 모델
+ * 하단 네비게이션 바의 탭 메뉴 항목 데이터 모델입니다.
+ *
+ * @property title 화면 노출용 탭 이름
+ * @property route 네비게이션 라우트 경로
  */
 sealed class BottomNavItem(val title: String, val route: String) {
     object Home : BottomNavItem("단수카운터", "home")
@@ -53,9 +54,9 @@ sealed class BottomNavItem(val title: String, val route: String) {
 }
 
 /**
- * 앱의 메인 화면 컴포저블
+ * 앱의 메인 화면 컴포저블입니다.
  *
- * 하단 네비게이션 바 제어, 사용자 로그인 세션 관리, 각 탭 간의 상태 호이스팅 및 비회원 접근 권한을 제어합니다.
+ * 하단 네비게이션 바 제어, 로그인 세션 상태 관리 및 탭 이동 제어, 비회원 권한 제한 다이얼로그 처리를 담당합니다.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -150,6 +151,7 @@ fun MainScreen() {
                         selected = currentRoute == item.route,
                         onClick = {
                             val isLoggedIn = currentUserSession != null
+                            // 회원 전용 탭(도안, 실 보관소)에 접근 시 비회원인 경우 로그인 안내 다이얼로그 노출
                             if (!isLoggedIn && (item == BottomNavItem.Pattern || item == BottomNavItem.Yarn)) {
                                 showLoginAuthDialog = true
                             } else {
@@ -200,8 +202,7 @@ fun MainScreen() {
                     ProjectListScreen(
                         projectList = projectList,
                         onAddProject = { newProject ->
-                            // 💡 [8번 수정을 위한 비동기 및 로컬 갱신 로직]
-                            // 백엔드 통신 전 로컬 뷰에 반영하고, 추후 API 연동 성공 시 real DB ID 객체로 치환합니다.
+                            // 빠른 반응성을 위해 백엔드 응답을 기다리지 않고 로컬 상태에 먼저 반영
                             projectList.add(0, newProject)
                         },
                         onDeleteProject = { projectToDelete -> projectList.remove(projectToDelete) },

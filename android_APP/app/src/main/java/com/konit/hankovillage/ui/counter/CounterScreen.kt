@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.konit.hankovillage.ui.yarn.YarnData
 
 val BgColor = Color(0xFFF7F4EB)
 val CardBg = Color(0xFFEFECE1)
@@ -50,6 +51,7 @@ data class MemoItem(
 @Composable
 fun CounterScreen(
     project: ProjectData,
+    yarnList: List<YarnData> = emptyList(),
     onBackClick: () -> Unit,
     onSaveProject: (ProjectData) -> Unit = {}
 ) {
