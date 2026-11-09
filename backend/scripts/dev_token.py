@@ -3,6 +3,7 @@
 Run inside the api container. This is not an API endpoint.
 
   docker compose exec -T api python -m scripts.dev_token issue --nickname tester1
+  docker compose exec -T api python -m scripts.dev_token issue --nickname tester1 --show-refresh
   echo "$TOKEN" | docker compose exec -T api python -m scripts.dev_token check
   docker compose exec -T api python -m scripts.dev_token cleanup
 """
@@ -23,7 +24,7 @@ TEST_PROVIDER = "test"
 NICKNAME_MAX = 10
 
 
-def issue(nickname: str) -> int:
+def issue(nickname: str, show_refresh: bool) -> int:
     if not 1 <= len(nickname) <= NICKNAME_MAX:
         print(f"nickname must be 1-{NICKNAME_MAX} characters", file=sys.stderr)
         return 1
@@ -47,13 +48,16 @@ def issue(nickname: str) -> int:
                 print("nickname is already used by a real user", file=sys.stderr)
                 return 1
         user_id = user.id
-        access_token, _ = start_session(db, user_id)
+        access_token, refresh_token = start_session(db, user_id)
         db.commit()
     print(
         f"test user id={user_id} nickname={nickname}, token valid for 1 hour",
         file=sys.stderr,
     )
     print(access_token)
+    if show_refresh:
+        # Second line, only when asked, so existing one-line usage keeps working.
+        print(refresh_token)
     return 0
 
 
@@ -82,11 +86,16 @@ def main() -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     issue_parser = sub.add_parser("issue", help="create a test user and session")
     issue_parser.add_argument("--nickname", default="tester1")
+    issue_parser.add_argument(
+        "--show-refresh",
+        action="store_true",
+        help="also print the refresh token on a second line",
+    )
     sub.add_parser("check", help="read a token from stdin and verify it")
     sub.add_parser("cleanup", help="delete all test users and their sessions")
     args = parser.parse_args()
     if args.command == "issue":
-        return issue(args.nickname)
+        return issue(args.nickname, args.show_refresh)
     if args.command == "check":
         return check()
     return cleanup()

@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -11,7 +11,7 @@ from app.db import get_db
 from app.errors import ApiError
 from app.models.user import User
 from app.nicknames import normalize_nickname
-from app.sessions import start_session
+from app.sessions import InvalidRefreshToken, end_session, rotate_session, start_session
 from app.social import verify_kakao_token
 from app.tokens import (
     ACCESS_TOKEN_LIFETIME,
@@ -73,6 +73,17 @@ class NicknameCheckResponse(BaseModel):
     reason: Literal["DUPLICATE", "INVALID_FORMAT"] | None
 
 
+class RefreshRequest(BaseModel):
+    refresh_token: str = Field(min_length=1, max_length=256)
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: Literal["bearer"] = "bearer"
+    expires_in: int
+
+
 def invalid_signup_token() -> ApiError:
     return ApiError(401, "INVALID_SIGNUP_TOKEN", "다시 로그인해 주세요")
 
@@ -83,6 +94,10 @@ def already_registered() -> ApiError:
 
 def nickname_duplicate() -> ApiError:
     return ApiError(409, "NICKNAME_DUPLICATE", "이미 사용 중인 닉네임이에요")
+
+
+def invalid_refresh_token() -> ApiError:
+    return ApiError(401, "INVALID_REFRESH_TOKEN", "다시 로그인해 주세요")
 
 
 def find_user(db: Session, provider: str, provider_id: str) -> User | None:
@@ -148,6 +163,30 @@ def signup(body: SignupRequest, db: Session = Depends(get_db)):
             raise already_registered()
         raise nickname_duplicate()
     return login_response(db, user)
+
+
+@router.post("/refresh", response_model=TokenResponse)
+def refresh(body: RefreshRequest, db: Session = Depends(get_db)):
+    try:
+        access_token, refresh_token = rotate_session(db, body.refresh_token)
+    except InvalidRefreshToken:
+        # Save the session deletion from reuse detection before answering 401.
+        db.commit()
+        raise invalid_refresh_token()
+    db.commit()
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=int(ACCESS_TOKEN_LIFETIME.total_seconds()),
+    )
+
+
+@router.post("/logout", status_code=204, response_class=Response)
+def logout(body: RefreshRequest, db: Session = Depends(get_db)):
+    # Always 204, so the app can clear its tokens whatever the server state is.
+    end_session(db, body.refresh_token)
+    db.commit()
+    return Response(status_code=204)
 
 
 @users_router.get("/nickname-check", response_model=NicknameCheckResponse)
