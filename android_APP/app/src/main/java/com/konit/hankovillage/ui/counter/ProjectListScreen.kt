@@ -3,13 +3,16 @@ package com.konit.hankovillage.ui.counter
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,22 +20,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.konit.hankovillage.ui.theme.BgColor
 import com.konit.hankovillage.ui.theme.CardBg
 import com.konit.hankovillage.ui.theme.PointOrange
 import com.konit.hankovillage.ui.theme.TextDark
+import com.konit.hankovillage.ui.yarn.YarnData
 
 /**
-- 등록된 프로젝트 카운터 목록을 조회하고, 신규 카운터를 추가하거나 선택/삭제하는 화면 컴포저블
+ * 등록된 프로젝트 카운터 목록을 조회하고, 신규 카운터를 추가하거나 선택/삭제하는 화면 컴포저블
  */
 @Composable
 fun ProjectListScreen(
     projectList: List<ProjectData>,
     onAddProject: (ProjectData) -> Unit,
     onDeleteProject: (ProjectData) -> Unit,
-    onProjectSelect: (ProjectData) -> Unit
+    onProjectSelect: (ProjectData) -> Unit,
+    yarnList: List<YarnData> = emptyList()
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
 
@@ -73,7 +79,7 @@ fun ProjectListScreen(
                     text = "등록된 카운터가 없습니다.\n'+ 새 카운터'를 눌러 시작해보세요!",
                     fontSize = 13.sp,
                     color = Color.Gray,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    textAlign = TextAlign.Center
                 )
             }
         } else {
@@ -98,7 +104,9 @@ fun ProjectListScreen(
         var nameInput by remember { mutableStateOf("") }
         var selectedKoreanNeedle by remember { mutableStateOf("대바늘") }
         var needleInput by remember { mutableStateOf("") }
+        var selectedYarnId by remember { mutableStateOf<Int?>(null) }
         var targetRowInput by remember { mutableStateOf("") }
+        var showYarnSelectDialog by remember { mutableStateOf(false) }
 
         val parsedTarget = targetRowInput.toIntOrNull()
         val isTargetInvalid = targetRowInput.isNotBlank() && (parsedTarget == null || parsedTarget < 1)
@@ -137,13 +145,29 @@ fun ProjectListScreen(
                         }
                     }
 
-                    OutlinedTextField(
-                        value = needleInput,
-                        onValueChange = { if (it.length <= 50) needleInput = it },
-                        label = { Text("실 · 바늘 상세 정보 (예: 메리노울 / 4.0mm)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    Column {
+                        OutlinedTextField(
+                            value = needleInput,
+                            onValueChange = { if (it.length <= 50) needleInput = it },
+                            label = { Text("실 · 바늘 상세 정보 (예: 메리노울 / 4.0mm)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        OutlinedButton(
+                            onClick = { showYarnSelectDialog = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ShoppingBag,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("실 보관소에서 불러오기", fontSize = 12.sp, color = PointOrange)
+                        }
+                    }
 
                     OutlinedTextField(
                         value = targetRowInput,
@@ -168,12 +192,13 @@ fun ProjectListScreen(
 
                             val newProject = ProjectData(
                                 id = System.currentTimeMillis(),
-                                name = nameInput,
+                                name = nameInput.trim(),
                                 needleType = serverNeedleType,
                                 needle = needleInput.ifBlank { null },
+                                yarnId = selectedYarnId,
                                 currentRows = 0,
                                 targetRows = parsedTarget,
-                                status = "진행"
+                                status = "in_progress"
                             )
 
                             onAddProject(newProject)
@@ -192,11 +217,56 @@ fun ProjectListScreen(
                 }
             }
         )
+
+        if (showYarnSelectDialog) {
+            AlertDialog(
+                onDismissRequest = { showYarnSelectDialog = false },
+                title = { Text("실 선택", fontWeight = FontWeight.Bold) },
+                text = {
+                    if (yarnList.isEmpty()) {
+                        Text(
+                            "실 보관소에 등록된 실이 없습니다.\n'실 보관소' 탭에서 실을 먼저 등록해 보세요.",
+                            fontSize = 13.sp,
+                            color = Color.Gray
+                        )
+                    } else {
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.heightIn(max = 250.dp)
+                        ) {
+                            items(yarnList) { yarn ->
+                                Card(
+                                    onClick = {
+                                        needleInput = yarn.name.take(50)
+                                        selectedYarnId = yarn.id.toInt()
+                                        showYarnSelectDialog = false
+                                    },
+                                    colors = CardDefaults.cardColors(containerColor = CardBg),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Text(yarn.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextDark)
+                                        if (yarn.color.isNotBlank()) {
+                                            Text(yarn.color, fontSize = 11.sp, color = Color.Gray)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showYarnSelectDialog = false }) {
+                        Text("닫기", color = Color.Gray)
+                    }
+                }
+            )
+        }
     }
 }
 
 /**
-- 개별 카운터 카드 항목 컴포저블
+ * 개별 카운터 카드 항목 컴포저블
  */
 @Composable
 fun ProjectCardItem(
@@ -225,13 +295,14 @@ fun ProjectCardItem(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                val isProgress = project.status == "진행"
+                val statusDisplay = project.getStatusDisplay()
+                val isProgress = statusDisplay == "진행"
                 Surface(
                     color = if (isProgress) Color(0xFFFDF0E9) else Color(0xFFE3EAD8),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
-                        text = project.status,
+                        text = statusDisplay,
                         fontSize = 11.sp,
                         color = if (isProgress) PointOrange else Color(0xFF4CAF50),
                         fontWeight = FontWeight.Bold,

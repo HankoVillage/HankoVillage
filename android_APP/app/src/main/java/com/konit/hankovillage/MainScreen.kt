@@ -201,6 +201,7 @@ fun MainScreen() {
                 if (selectedProject == null) {
                     ProjectListScreen(
                         projectList = projectList,
+                        yarnList = yarnList,
                         onAddProject = { newProject ->
                             // 빠른 반응성을 위해 백엔드 응답을 기다리지 않고 로컬 상태에 먼저 반영
                             projectList.add(0, newProject)
