@@ -2,7 +2,6 @@ package com.konit.hankovillage
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.List
@@ -15,10 +14,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -62,8 +59,6 @@ sealed class BottomNavItem(val title: String, val route: String) {
 @Composable
 fun MainScreen() {
     val navController = rememberNavController()
-    val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
 
     var currentUserSession by remember { mutableStateOf<UserSession?>(null) }
     var showLoginAuthDialog by remember { mutableStateOf(false) }
@@ -80,7 +75,7 @@ fun MainScreen() {
                 needle = "메리노 울 · 4.0mm",
                 currentRows = 47,
                 targetRows = 120,
-                status = "진행"
+                status = "in_progress"
             )
         )
     }
@@ -132,9 +127,7 @@ fun MainScreen() {
         containerColor = appBgColor,
         bottomBar = {
             NavigationBar(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(90.dp),
+                modifier = Modifier.fillMaxWidth(),
                 containerColor = appBgColor,
                 windowInsets = NavigationBarDefaults.windowInsets
             ) {
@@ -151,7 +144,6 @@ fun MainScreen() {
                         selected = currentRoute == item.route,
                         onClick = {
                             val isLoggedIn = currentUserSession != null
-                            // 회원 전용 탭(도안, 실 보관소)에 접근 시 비회원인 경우 로그인 안내 다이얼로그 노출
                             if (!isLoggedIn && (item == BottomNavItem.Pattern || item == BottomNavItem.Yarn)) {
                                 showLoginAuthDialog = true
                             } else {
@@ -203,7 +195,6 @@ fun MainScreen() {
                         projectList = projectList,
                         yarnList = yarnList,
                         onAddProject = { newProject ->
-                            // 빠른 반응성을 위해 백엔드 응답을 기다리지 않고 로컬 상태에 먼저 반영
                             projectList.add(0, newProject)
                         },
                         onDeleteProject = { projectToDelete -> projectList.remove(projectToDelete) },

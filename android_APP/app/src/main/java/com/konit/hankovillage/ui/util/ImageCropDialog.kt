@@ -44,17 +44,14 @@ fun decodeSampledBitmapFromUri(
     reqHeight: Int = 1024
 ): Bitmap? {
     return try {
-        // 1. 크기만 먼저 읽기
         val options = BitmapFactory.Options().apply {
             inJustDecodeBounds = true
         }
         context.contentResolver.openInputStream(uri)?.use { inputStream ->
             BitmapFactory.decodeStream(inputStream, null, options)
         }
-
         if (options.outWidth <= 0 || options.outHeight <= 0) return null
 
-        // 2. inSampleSize 계산 후 비트맵 디코딩
         options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight)
         options.inJustDecodeBounds = false
 
@@ -62,7 +59,6 @@ fun decodeSampledBitmapFromUri(
             BitmapFactory.decodeStream(inputStream, null, options)
         } ?: return null
 
-        // 3. EXIF 회전 정보 보정
         rotateImageIfRequired(context, uri, decodedBitmap)
     } catch (e: Exception) {
         e.printStackTrace()
@@ -114,7 +110,7 @@ private fun rotateImageIfRequired(context: Context, uri: Uri, bitmap: Bitmap): B
             val rotatedBitmap = Bitmap.createBitmap(
                 bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true
             )
-            bitmap.recycle() // 기존 비트맵 메모리 해제
+            bitmap.recycle()
             rotatedBitmap
         } else {
             bitmap
