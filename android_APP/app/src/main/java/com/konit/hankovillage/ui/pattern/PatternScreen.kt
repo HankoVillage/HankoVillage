@@ -612,7 +612,8 @@ fun PatternDetailContent(
                 Button(
                     onClick = {
                         deleteCroppedImageFile(context, pattern.imageUrl)
-                        onDelete(pattern.id) },
+                        onDelete(pattern.id)
+                    },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
                 ) {
                     Text("삭제", color = Color.White)
@@ -665,7 +666,6 @@ fun PatternUploadDialog(
             }
         )
     }
-
 
     AlertDialog(
         onDismissRequest = handleDismiss,
@@ -787,7 +787,7 @@ fun PatternUploadDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("취소", color = Color.Gray) }
+            TextButton(onClick = handleDismiss) { Text("취소", color = Color.Gray) }
         }
     )
 }
@@ -816,23 +816,29 @@ fun PatternEditDialog(
     val initialImageUri = pattern.imageUrl
     var imageUri by remember { mutableStateOf(initialImageUri) }
 
+    val handleDismiss = {
+        if (imageUri != initialImageUri) {
+            deleteCroppedImageFile(context, imageUri)
+        }
+        onDismiss()
+    }
+
     if (pendingCropUri != null) {
         ImageCropDialog(
             imageUri = pendingCropUri!!,
             onDismiss = { pendingCropUri = null },
             onCropComplete = { croppedUri ->
+                if (imageUri != initialImageUri) {
+                    deleteCroppedImageFile(context, imageUri)
+                }
                 imageUri = croppedUri.toString()
                 pendingCropUri = null
             }
         )
     }
 
-    if (imageUri != initialImageUri) {
-        deleteCroppedImageFile(context, initialImageUri)
-    }
-
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = handleDismiss,
         title = { Text("도안 정보 수정", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -954,7 +960,7 @@ fun PatternEditDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("취소", color = Color.Gray) }
+            TextButton(onClick = handleDismiss) { Text("취소", color = Color.Gray) }
         }
     )
 }
