@@ -11,6 +11,9 @@ logger = logging.getLogger(__name__)
 
 KAKAO_ISSUER = "https://kauth.kakao.com"
 KAKAO_JWKS_URL = "https://kauth.kakao.com/.well-known/jwks.json"
+# Google issues ID tokens with either form of iss.
+GOOGLE_ISSUERS = ("https://accounts.google.com", "accounts.google.com")
+GOOGLE_JWKS_URL = "https://www.googleapis.com/oauth2/v3/certs"
 
 # Seconds. Temporary value: must stay well below nginx proxy_read_timeout (60s).
 JWKS_TIMEOUT = 5
@@ -20,6 +23,7 @@ JWKS_CACHE_SECONDS = 3600
 CLOCK_LEEWAY = 60
 
 kakao_jwks = PyJWKClient(KAKAO_JWKS_URL, lifespan=JWKS_CACHE_SECONDS, timeout=JWKS_TIMEOUT)
+google_jwks = PyJWKClient(GOOGLE_JWKS_URL, lifespan=JWKS_CACHE_SECONDS, timeout=JWKS_TIMEOUT)
 
 
 def invalid_social_token() -> ApiError:
@@ -30,7 +34,9 @@ def social_provider_unavailable() -> ApiError:
     return ApiError(503, "SOCIAL_PROVIDER_UNAVAILABLE", "잠시 후 다시 시도해 주세요")
 
 
-def verify_id_token(token: str, jwks: PyJWKClient, issuer: str, audience: str, provider: str) -> str:
+def verify_id_token(
+    token: str, jwks: PyJWKClient, issuer: str | tuple[str, ...], audience: str, provider: str
+) -> str:
     # Checks signature, iss, aud, exp and returns sub. Never log the token itself.
     try:
         kid = jwt.get_unverified_header(token).get("kid")
@@ -77,3 +83,8 @@ def verify_id_token(token: str, jwks: PyJWKClient, issuer: str, audience: str, p
 
 def verify_kakao_token(token: str) -> str:
     return verify_id_token(token, kakao_jwks, KAKAO_ISSUER, settings.kakao_native_app_key, "Kakao")
+
+
+def verify_google_token(token: str) -> str:
+    # aud is the web client ID the app passes as serverClientId, not the Android client ID.
+    return verify_id_token(token, google_jwks, GOOGLE_ISSUERS, settings.google_web_client_id, "Google")

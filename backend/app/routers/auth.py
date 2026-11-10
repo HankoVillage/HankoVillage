@@ -12,7 +12,7 @@ from app.errors import ApiError
 from app.models.user import User
 from app.nicknames import normalize_nickname
 from app.sessions import InvalidRefreshToken, end_session, rotate_session, start_session
-from app.social import verify_kakao_token
+from app.social import verify_google_token, verify_kakao_token
 from app.tokens import (
     ACCESS_TOKEN_LIFETIME,
     SIGNUP_TOKEN_LIFETIME,
@@ -25,9 +25,9 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 # Registered before any /users/{id} routes so "nickname-check" is not read as an id.
 users_router = APIRouter(prefix="/users", tags=["auth"])
 
-# Add "google" here together with its verify function.
-Provider = Literal["kakao"]
-VERIFIERS = {"kakao": verify_kakao_token}
+# A new provider needs both an entry here and a verify function in app/social.py.
+Provider = Literal["kakao", "google"]
+VERIFIERS = {"kakao": verify_kakao_token, "google": verify_google_token}
 
 
 class SocialLoginRequest(BaseModel):
