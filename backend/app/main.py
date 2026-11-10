@@ -1,9 +1,18 @@
+import logging
+
 from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.db import get_db
 from app.errors import ApiError, register_error_handlers
 from app.routers import auth, memos, projects
+
+# Show INFO and above from our own code (for example the account deletion record).
+# Without this, Python drops everything below WARNING because no handler is set up.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 app = FastAPI(
     title="HankoVillage API Server",
