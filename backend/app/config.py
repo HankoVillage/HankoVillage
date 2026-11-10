@@ -3,6 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 MIN_SECRET_LENGTH = 43
 PLACEHOLDER_PREFIX = "change-me"
+GOOGLE_CLIENT_ID_SUFFIX = ".apps.googleusercontent.com"
 
 
 class Settings(BaseSettings):
@@ -18,6 +19,7 @@ class Settings(BaseSettings):
     jwt_signup_secret: SecretStr
 
     kakao_native_app_key: str
+    google_web_client_id: str
 
     @property
     def database_url(self) -> str:
@@ -43,6 +45,13 @@ class Settings(BaseSettings):
     def check_kakao_native_app_key(self) -> "Settings":
         if not self.kakao_native_app_key or self.kakao_native_app_key.startswith(PLACEHOLDER_PREFIX):
             raise ValueError("KAKAO_NATIVE_APP_KEY is not set. Copy the native app key from Kakao Developers into .env.")
+        return self
+
+    @model_validator(mode="after")
+    def check_google_web_client_id(self) -> "Settings":
+        value = self.google_web_client_id
+        if not value or value.startswith(PLACEHOLDER_PREFIX) or not value.endswith(GOOGLE_CLIENT_ID_SUFFIX):
+            raise ValueError(f"GOOGLE_WEB_CLIENT_ID is not set. Copy the Web application client ID (ends with {GOOGLE_CLIENT_ID_SUFFIX}) from Google Cloud Console into .env.")
         return self
 
 
