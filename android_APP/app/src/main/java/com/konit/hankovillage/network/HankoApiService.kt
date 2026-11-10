@@ -22,6 +22,11 @@ interface HankoApiService {
     @POST("auth/logout")
     suspend fun logout(@Body request: RefreshRequest): Response<Unit>
 
+    @POST("auth/social/google")
+    suspend fun socialLoginGoogle(
+        @Body request: SocialLoginRequest
+    ): Response<SocialLoginResponse>
+
     /**
      * 카카오 임시 가입 토큰과 사용자 입력 프로필 정보를 전달하여 최종 회원가입을 완료합니다.
      */

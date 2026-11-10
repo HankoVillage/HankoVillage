@@ -21,6 +21,15 @@ import com.kakao.sdk.user.UserApiClient
 import com.konit.hankovillage.network.RetrofitInstance
 import com.konit.hankovillage.network.SocialLoginRequest
 import com.konit.hankovillage.ui.profile.UserProfileData
+import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.GetCredentialException
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.konit.hankovillage.R
+import com.konit.hankovillage.network.SessionManager
 import com.konit.hankovillage.ui.theme.BgColor
 import com.konit.hankovillage.ui.theme.GoogleBg
 import com.konit.hankovillage.ui.theme.GoogleBorder
@@ -145,12 +154,13 @@ fun LoginScreen(
                     isLoading = true
                     handleGoogleLogin(
                         context = context,
-                        onSuccess = { email, nickname, profileImage ->
+                        coroutineScope = coroutineScope,
+                        onSuccess = { userId, nickname, profileImage ->
                             isLoading = false
                             val session = UserSession(
-                                userId = email,
+                                userId = userId,
                                 provider = "google",
-                                providerId = email,
+                                providerId = userId,
                                 profile = UserProfileData(
                                     nickname = nickname,
                                     bio = "구글 계정으로 시작한 뜨개이웃",
@@ -160,9 +170,13 @@ fun LoginScreen(
                             Toast.makeText(context, "${nickname}님 환영합니다!", Toast.LENGTH_SHORT).show()
                             onLoginSuccess(session)
                         },
-                        onFailure = {
+                        onNewUser = { signupToken ->
                             isLoading = false
-                            Toast.makeText(context, "구글 로그인 실패: ${it.message}", Toast.LENGTH_SHORT).show()
+                            onSignupRequired(signupToken)
+                        },
+                        onFailure = { message ->
+                            isLoading = false
+                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                         }
                     )
                 },
@@ -281,12 +295,83 @@ private fun handleKakaoLogin(
 }
 
 /**
- * 구글 소셜 로그인 연동 핸들러입니다.
+ * 구글 소셜 로그인(Credential Manager) 및 실서버(POST /auth/social/google) 연동 핸들러
  */
 private fun handleGoogleLogin(
     context: Context,
-    onSuccess: (email: String, nickname: String, profileImage: String?) -> Unit,
-    onFailure: (Throwable) -> Unit
+    coroutineScope: CoroutineScope,
+    onSuccess: (userId: String, nickname: String, profileImage: String?) -> Unit,
+    onNewUser: (signupToken: String) -> Unit,
+    onFailure: (String) -> Unit
 ) {
-    onSuccess("gmail_knitter@gmail.com", "G메일뜨개러", null)
+    val apiService = RetrofitInstance.getApiService(context)
+    val credentialManager = CredentialManager.create(context)
+
+    val googleIdOption = GetGoogleIdOption.Builder()
+        .setFilterByAuthorizedAccounts(false)
+        .setServerClientId(context.getString(R.string.default_web_client_id))
+        .setAutoSelectEnabled(false)
+        .build()
+
+    val request = GetCredentialRequest.Builder()
+        .addCredentialOption(googleIdOption)
+        .build()
+
+    coroutineScope.launch {
+        try {
+            val result = credentialManager.getCredential(
+                request = request,
+                context = context
+            )
+            val credential = result.credential
+
+            if (credential is CustomCredential &&
+                credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+            ) {
+                val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
+                val idToken = googleIdTokenCredential.idToken
+
+                val response = apiService.socialLoginGoogle(SocialLoginRequest(token = idToken))
+                if (response.isSuccessful && response.body() != null) {
+                    val body = response.body()!!
+                    if (body.isNewUser) {
+                        val signupToken = body.signupToken
+                        if (signupToken != null) {
+                            onNewUser(signupToken)
+                        } else {
+                            onFailure("가입 토큰을 받지 못했습니다.")
+                        }
+                    } else {
+                        SessionManager.saveTokens(
+                            context = context,
+                            accessToken = body.accessToken ?: "",
+                            refreshToken = body.refreshToken ?: ""
+                        )
+                        onSuccess(
+                            body.user?.id?.toString() ?: "",
+                            body.user?.nickname ?: "뜨개이웃",
+                            null
+                        )
+                    }
+                } else {
+                    when (response.code()) {
+                        401 -> onFailure("인증에 실패했습니다. 구글 로그인을 다시 시도해 주세요.")
+                        409 -> onFailure("이미 가입된 계정입니다. 구글 로그인을 다시 시도해 주세요.")
+                        503 -> onFailure("잠시 후 다시 시도해 주세요.")
+                        else -> onFailure("로그인 실패 (${response.code()})")
+                    }
+                }
+            } else {
+                onFailure("구글 인증 정보를 가져오지 못했습니다.")
+            }
+        } catch (e: GetCredentialCancellationException) {
+            onFailure("구글 로그인이 취소되었습니다.")
+        } catch (e: GetCredentialException) {
+            Log.e("GoogleAuth", "Credential Manager 오류", e)
+            onFailure("구글 로그인에 실패했습니다.")
+        } catch (e: Exception) {
+            Log.e("GoogleAuth", "서버 로그인 통신 오류", e)
+            onFailure("서버 통신이 원활하지 않습니다. 잠시 후 다시 시도해 주세요.")
+        }
+    }
 }
