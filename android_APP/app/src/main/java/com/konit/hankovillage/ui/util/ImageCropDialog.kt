@@ -90,13 +90,13 @@ private fun calculateInSampleSize(
  */
 private fun rotateImageIfRequired(context: Context, uri: Uri, bitmap: Bitmap): Bitmap {
     return try {
-        val inputStream = context.contentResolver.openInputStream(uri) ?: return bitmap
-        val ei = ExifInterface(inputStream)
-        val orientation = ei.getAttributeInt(
-            ExifInterface.TAG_ORIENTATION,
-            ExifInterface.ORIENTATION_NORMAL
-        )
-        inputStream.close()
+        val orientation = context.contentResolver.openInputStream(uri)?.use { inputStream ->
+            val ei = ExifInterface(inputStream)
+            ei.getAttributeInt(
+                ExifInterface.TAG_ORIENTATION,
+                ExifInterface.ORIENTATION_NORMAL
+            )
+        } ?: return bitmap
 
         val degree = when (orientation) {
             ExifInterface.ORIENTATION_ROTATE_90 -> 90f
