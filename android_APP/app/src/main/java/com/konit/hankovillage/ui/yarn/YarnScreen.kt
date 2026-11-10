@@ -1,5 +1,6 @@
 package com.konit.hankovillage.ui.yarn
 
+import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -13,7 +14,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddAPhoto
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -32,6 +32,8 @@ import com.konit.hankovillage.ui.theme.BgColor
 import com.konit.hankovillage.ui.theme.CardBg
 import com.konit.hankovillage.ui.theme.PointOrange
 import com.konit.hankovillage.ui.theme.TextDark
+import com.konit.hankovillage.ui.util.ImageCropDialog
+import com.konit.hankovillage.ui.util.deleteCroppedImageFile
 
 /**
  * 실 보관소 메인 화면
@@ -203,7 +205,7 @@ fun YarnCardItem(
 }
 
 /**
- * 실 상세 보기 화면 (전체 화면 형태)
+ * 실 상세 보기 화면 (1:1 크롭 다이얼로그 연동)
  */
 @Composable
 fun YarnDetailContent(
@@ -215,14 +217,24 @@ fun YarnDetailContent(
     val context = LocalContext.current
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
+    var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
 
     val detailGalleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
-        uri?.let {
-            onUpdate(yarn.copy(imageUrl = it.toString()))
-            Toast.makeText(context, "사진이 등록되었습니다.", Toast.LENGTH_SHORT).show()
-        }
+        uri?.let { pendingCropUri = it }
+    }
+
+    if (pendingCropUri != null) {
+        ImageCropDialog(
+            imageUri = pendingCropUri!!,
+            onDismiss = { pendingCropUri = null },
+            onCropComplete = { croppedUri ->
+                deleteCroppedImageFile(context, yarn.imageUrl)
+                onUpdate(yarn.copy(imageUrl = croppedUri.toString()))
+                pendingCropUri = null
+            }
+        )
     }
 
     Column(
@@ -366,7 +378,7 @@ fun YarnDetailContent(
                 }
 
                 if (yarn.memo.isNotBlank()) {
-                    Divider(color = Color.LightGray.copy(alpha = 0.5f), thickness = 1.dp)
+                    HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f), thickness = 1.dp)
                     Text("메모", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextDark)
                     Text(yarn.memo, fontSize = 13.sp, color = TextDark)
                 }
@@ -403,7 +415,10 @@ fun YarnDetailContent(
             text = { Text("\"${yarn.name}\" 실 정보를 삭제하시겠습니까?") },
             confirmButton = {
                 Button(
-                    onClick = { onDelete(yarn.id) },
+                    onClick = {
+                        deleteCroppedImageFile( context, yarn.imageUrl )
+                        onDelete( yarn.id )
+                    },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
                 ) {
                     Text("삭제", color = Color.White)
@@ -419,28 +434,47 @@ fun YarnDetailContent(
 }
 
 /**
- * 신규 실 등록 다이얼로그 (서버 422 에러 방지를 위한 글자 수 제한 및 카운터 가이드 적용)
+ * 신규 실 등록 다이얼로그 (1:1 크롭 다이얼로그 연동)
  */
 @Composable
 fun YarnUploadDialog(
     onDismiss: () -> Unit,
     onConfirm: (YarnData) -> Unit
 ) {
-    var name by remember { mutableStateOf("") }         // 최대 50자 제한
-    var color by remember { mutableStateOf("") }        // 최대 30자 제한
-    var shop by remember { mutableStateOf("") }         // 최대 100자 제한
+    val context = LocalContext.current
+    var name by remember { mutableStateOf("") }
+    var color by remember { mutableStateOf("") }
+    var shop by remember { mutableStateOf("") }
     var purchaseDate by remember { mutableStateOf("") }
-    var memo by remember { mutableStateOf("") }         // 최대 100자 제한
+    var memo by remember { mutableStateOf("") }
     var imageUri by remember { mutableStateOf<String?>(null) }
+    var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
-        uri?.let { imageUri = it.toString() }
+        uri?.let { pendingCropUri = it }
+    }
+
+    val handleDismiss = {
+        deleteCroppedImageFile(context, imageUri)
+        onDismiss()
+    }
+
+    if (pendingCropUri != null) {
+        ImageCropDialog(
+            imageUri = pendingCropUri!!,
+            onDismiss = { pendingCropUri = null },
+            onCropComplete = { croppedUri ->
+                deleteCroppedImageFile(context, imageUri)
+                imageUri = croppedUri.toString()
+                pendingCropUri = null
+            }
+        )
     }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = handleDismiss,
         title = { Text("새 실 등록", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -567,13 +601,13 @@ fun YarnUploadDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("취소", color = Color.Gray) }
+            TextButton(onClick = handleDismiss) { Text("취소", color = Color.Gray) }
         }
     )
 }
 
 /**
- * 실 정보 수정 다이얼로그 (서버 422 에러 방지를 위한 글자 수 제한 및 카운터 가이드 적용)
+ * 실 정보 수정 다이얼로그 (1:1 크롭 다이얼로그 연동)
  */
 @Composable
 fun YarnEditDialog(
@@ -586,16 +620,41 @@ fun YarnEditDialog(
     var shop by remember { mutableStateOf(yarn.shop) }
     var purchaseDate by remember { mutableStateOf(yarn.purchaseDate) }
     var memo by remember { mutableStateOf(yarn.memo) }
-    var imageUri by remember { mutableStateOf(yarn.imageUrl) }
+    val context = LocalContext.current
+    var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
-        uri?.let { imageUri = it.toString() }
+        uri?.let { pendingCropUri = it }
+    }
+
+    val initialImageUri = yarn.imageUrl
+    var imageUri by remember { mutableStateOf(initialImageUri) }
+
+    val handleDismiss = {
+        if (imageUri != initialImageUri) {
+            deleteCroppedImageFile(context, imageUri)
+        }
+        onDismiss()
+    }
+
+    if (pendingCropUri != null) {
+        ImageCropDialog(
+            imageUri = pendingCropUri!!,
+            onDismiss = { pendingCropUri = null },
+            onCropComplete = { croppedUri ->
+                if (imageUri != initialImageUri) {
+                    deleteCroppedImageFile(context, imageUri)
+                }
+                imageUri = croppedUri.toString()
+                pendingCropUri = null
+            }
+        )
     }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = handleDismiss,
         title = { Text("실 정보 수정", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -704,6 +763,9 @@ fun YarnEditDialog(
             Button(
                 onClick = {
                     if (name.isNotBlank()) {
+                        if (imageUri != initialImageUri) {
+                            deleteCroppedImageFile(context, initialImageUri)
+                        }
                         onConfirm(
                             yarn.copy(
                                 name = name,
@@ -722,7 +784,7 @@ fun YarnEditDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("취소", color = Color.Gray) }
+            TextButton(onClick = handleDismiss) { Text("취소", color = Color.Gray) }
         }
     )
 }

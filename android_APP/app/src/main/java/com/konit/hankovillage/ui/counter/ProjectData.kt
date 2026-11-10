@@ -1,49 +1,94 @@
 package com.konit.hankovillage.ui.counter
 
+import com.google.gson.annotations.SerializedName
 import androidx.compose.runtime.saveable.Saver
 
-/**
- * 프로젝트 카운터 데이터 모델
- */
 data class ProjectData(
-    val id: Long = System.currentTimeMillis(),
-    val title: String,
-    val needleType: String,
-    val yarnAndNeedle: String,
-    val currentRows: Int,
-    val totalRows: Int,
-    val status: String,
-    val memo: String
-)
+    @SerializedName("id")
+    val id: Long = 0,
 
-/**
- * Nullable ProjectData? 전용 Saver (rememberSaveable 타입 에러 완벽 해결)
- */
-val ProjectDataSaver = Saver<ProjectData?, List<Any>>(
+    @SerializedName("name")
+    var name: String,
+
+    @SerializedName("needle_type")
+    var needleType: String = "knitting",
+
+    @SerializedName("needle")
+    var needle: String? = null,
+
+    @SerializedName("yarn_id")
+    var yarnId: Long? = null,
+
+    @SerializedName("current_row")
+    var currentRows: Int = 0,
+
+    @SerializedName("target_row")
+    var targetRows: Int? = null,
+
+    @SerializedName("status")
+    var status: String = "in_progress",
+) {
+    fun getNeedleTypeDisplay(): String {
+        return when (needleType) {
+            "crochet" -> "코바늘"
+            "both" -> "둘 다"
+            else -> "대바늘"
+        }
+    }
+
+    fun getStatusDisplay(): String {
+        return when (status) {
+            "done" -> "완성"
+            else -> "진행"
+        }
+    }
+
+    companion object {
+        fun toServerNeedleType(koreanText: String): String {
+            return when (koreanText) {
+                "코바늘" -> "crochet"
+                "둘 다" -> "both"
+                else -> "knitting"
+            }
+        }
+
+        fun toServerStatus(koreanText: String): String {
+            return when (koreanText) {
+                "완성", "완료" -> "done"
+                else -> "in_progress"
+            }
+        }
+    }
+}
+data class ProjectCounterUpdateRequest(
+    @SerializedName("current_row")
+    val currentRow: Int
+)
+val ProjectDataSaver = Saver<ProjectData?, List<Any?>>(
     save = { project ->
         if (project == null) emptyList()
         else listOf(
             project.id,
-            project.title,
+            project.name,
             project.needleType,
-            project.yarnAndNeedle,
+            project.needle,
+            project.yarnId,
             project.currentRows,
-            project.totalRows,
-            project.status,
-            project.memo
+            project.targetRows,
+            project.status
         )
     },
     restore = { list ->
         if (list.isEmpty()) null
         else ProjectData(
             id = list[0] as Long,
-            title = list[1] as String,
+            name = list[1] as String,
             needleType = list[2] as String,
-            yarnAndNeedle = list[3] as String,
-            currentRows = list[4] as Int,
-            totalRows = list[5] as Int,
-            status = list[6] as String,
-            memo = list[7] as String
+            needle = list[3] as? String,
+            yarnId = list[4] as? Long,
+            currentRows = list[5] as Int,
+            targetRows = list[6] as? Int,
+            status = list[7] as String
         )
     }
 )

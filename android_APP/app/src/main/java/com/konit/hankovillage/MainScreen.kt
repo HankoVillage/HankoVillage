@@ -37,10 +37,10 @@ import com.konit.hankovillage.ui.yarn.YarnData
 import com.konit.hankovillage.ui.yarn.YarnScreen
 
 /**
- * 하단 네비게이션 바의 탭 메뉴 항목 데이터 모델
+ * 하단 네비게이션 바의 탭 메뉴 항목 데이터 모델입니다.
  *
- * @property title 탭에 표시될 텍스트
- * @property route 네비게이션 라우팅 경로
+ * @property title 화면 노출용 탭 이름
+ * @property route 네비게이션 라우트 경로
  */
 sealed class BottomNavItem(val title: String, val route: String) {
     object Home : BottomNavItem("단수카운터", "home")
@@ -51,14 +51,15 @@ sealed class BottomNavItem(val title: String, val route: String) {
 }
 
 /**
- * 앱의 메인 화면 컴포저블
+ * 앱의 메인 화면 컴포저블입니다.
  *
- * 하단 네비게이션 바 제어, 사용자 로그인 세션 관리, 각 탭 간의 상태 호이스팅 및 비회원 접근 권한을 제어합니다.
+ * 하단 네비게이션 바 제어, 로그인 세션 상태 관리 및 탭 이동 제어, 비회원 권한 제한 다이얼로그 처리를 담당합니다.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen() {
     val navController = rememberNavController()
+
     var currentUserSession by remember { mutableStateOf<UserSession?>(null) }
     var showLoginAuthDialog by remember { mutableStateOf(false) }
 
@@ -69,13 +70,12 @@ fun MainScreen() {
         mutableStateListOf(
             ProjectData(
                 id = 1L,
-                title = "가을 머플러",
-                needleType = "대바늘",
-                yarnAndNeedle = "메리노 울 · 4.0mm",
+                name = "가을 머플러",
+                needleType = "knitting",
+                needle = "메리노 울 · 4.0mm",
                 currentRows = 47,
-                totalRows = 120,
-                status = "진행",
-                memo = "20단마다 무늬 바꾸기"
+                targetRows = 120,
+                status = "in_progress"
             )
         )
     }
@@ -144,7 +144,6 @@ fun MainScreen() {
                         selected = currentRoute == item.route,
                         onClick = {
                             val isLoggedIn = currentUserSession != null
-
                             if (!isLoggedIn && (item == BottomNavItem.Pattern || item == BottomNavItem.Yarn)) {
                                 showLoginAuthDialog = true
                             } else {
@@ -194,7 +193,10 @@ fun MainScreen() {
                 if (selectedProject == null) {
                     ProjectListScreen(
                         projectList = projectList,
-                        onAddProject = { newProject -> projectList.add(0, newProject) },
+                        yarnList = yarnList,
+                        onAddProject = { newProject ->
+                            projectList.add(0, newProject)
+                        },
                         onDeleteProject = { projectToDelete -> projectList.remove(projectToDelete) },
                         onProjectSelect = { project -> selectedProject = project }
                     )

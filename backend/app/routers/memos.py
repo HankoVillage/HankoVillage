@@ -22,7 +22,7 @@ def list_memos(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """특정 프로젝트의 메모 목록 조회 (남의 프로젝트면 404로 리소스 은닉)"""
+    """특정 프로젝트의 메모 목록 조회 (남의 프로젝트이거나 없으면 404로 리소스 은닉)"""
     project = db.query(Project).filter(
         Project.id == project_id,
         Project.user_id == current_user.id  
@@ -49,18 +49,18 @@ def create_memo(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """메모 추가 (전달받은 row_number가 있으면 우선 적용, 없으면 현재 프로젝트 단수 적용)"""
+    """
+    메모 추가 (비회원 이관 시 클라이언트의 row_number 지정 지원, 
+    생략 시 해당 프로젝트의 현재 단수 current_row 사용)
+    """
     project = db.query(Project).filter(
         Project.id == project_id,
-        Project.user_id == current_user.id 
+        Project.user_id == current_user.id  
     ).first()
 
     if not project:
         raise ApiError(404, "PROJECT_NOT_FOUND", "프로젝트를 찾을 수 없어요")
-
-    memo_row = getattr(req, "row_number", None)
-    if memo_row is None:
-        memo_row = project.current_row
+    memo_row = req.row_number if getattr(req, "row_number", None) is not None else project.current_row
 
     new_memo = Memo(
         project_id=project_id,
@@ -84,7 +84,7 @@ def update_memo(
     """메모 수정 (남의 메모이거나 존재하지 않는 메모면 404로 통일)"""
     memo = db.query(Memo).join(Project).filter(
         Memo.id == memo_id,
-        Project.user_id == current_user.id  
+        Project.user_id == current_user.id
     ).first()
 
     if not memo:
@@ -107,7 +107,7 @@ def delete_memo(
     """메모 삭제 (남의 메모이거나 존재하지 않는 메모면 404로 통일)"""
     memo = db.query(Memo).join(Project).filter(
         Memo.id == memo_id,
-        Project.user_id == current_user.id  
+        Project.user_id == current_user.id
     ).first()
 
     if not memo:

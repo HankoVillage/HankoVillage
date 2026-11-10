@@ -26,14 +26,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.konit.hankovillage.ui.yarn.YarnData
-import com.konit.hankovillage.ui.theme.AppBgColor
 import com.konit.hankovillage.ui.theme.BgColor
 import com.konit.hankovillage.ui.theme.CardBg
 import com.konit.hankovillage.ui.theme.PointOrange
 import com.konit.hankovillage.ui.theme.TextDark
+import com.konit.hankovillage.ui.yarn.YarnData
 
 data class MemoItem(
     val id: Long = System.currentTimeMillis(),
@@ -68,34 +68,29 @@ fun CounterScreen(
         }
     }
 
-    var title by remember(project.id) { mutableStateOf(project.title) }
-    var yarnAndNeedle by remember(project.id) { mutableStateOf(project.yarnAndNeedle) }
+    var title by remember(project.id) { mutableStateOf(project.name) }
+    var yarnAndNeedle by remember(project.id) { mutableStateOf(project.needle ?: "") }
+    var yarnId by remember(project.id) { mutableStateOf(project.yarnId) }
     var currentRows by remember(project.id) { mutableIntStateOf(project.currentRows) }
-    var totalRows by remember(project.id) { mutableIntStateOf(project.totalRows) }
-    var status by remember(project.id) { mutableStateOf(project.status) } // 진행 / 완료
-    val memoList = remember { mutableStateListOf<MemoItem>() }
-
-    LaunchedEffect(project.id) {
-        memoList.clear()
-        if (project.memo.isNotBlank()) {
-            memoList.add(MemoItem(count = currentRows, text = project.memo))
-        }
-    }
+    var targetRows by remember(project.id) { mutableStateOf(project.targetRows) }
+    var status by remember(project.id) { mutableStateOf(project.getStatusDisplay()) }
+    val memoList = remember(project.id) { mutableStateListOf<MemoItem>() }
 
     fun saveCurrentProjectState(
         updatedRows: Int = currentRows,
         updatedTitle: String = title,
         updatedYarnAndNeedle: String = yarnAndNeedle,
-        updatedTotalRows: Int = totalRows,
+        updatedYarnId: Long? = yarnId,
+        updatedTargetRows: Int? = targetRows,
         updatedStatus: String = status
     ) {
         val updatedProject = project.copy(
-            title = updatedTitle,
-            yarnAndNeedle = updatedYarnAndNeedle,
+            name = updatedTitle,
+            needle = updatedYarnAndNeedle.ifBlank { null },
+            yarnId = updatedYarnId,
             currentRows = updatedRows,
-            totalRows = updatedTotalRows,
-            status = updatedStatus,
-            memo = memoList.lastOrNull()?.text ?: project.memo
+            targetRows = updatedTargetRows,
+            status = ProjectData.toServerStatus(updatedStatus)
         )
         onSaveProject(updatedProject)
     }
@@ -111,8 +106,17 @@ fun CounterScreen(
     var showEditDialog by remember { mutableStateOf(false) }
     var showResetDialog by remember { mutableStateOf(false) }
 
-    val progress = if (totalRows > 0) (currentRows.toFloat() / totalRows.toFloat()).coerceIn(0f, 1f) else 0f
-    val remainingCount = (totalRows - currentRows).coerceAtLeast(0)
+    val target = targetRows
+    val progress = if (target != null && target > 0) {
+        (currentRows.toFloat() / target.toFloat()).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
+    val remainingCount = if (target != null && target > 0) {
+        (target - currentRows).coerceAtLeast(0)
+    } else {
+        null
+    }
 
     val scrollState = rememberScrollState()
 
@@ -142,9 +146,21 @@ fun CounterScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = "작업 상태: $status", fontSize = 12.sp, color = PointOrange, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "작업 상태: $status",
+                    fontSize = 12.sp,
+                    color = PointOrange,
+                    fontWeight = FontWeight.Bold
+                )
+                val connectedYarnName = yarnList.find { it.id == yarnId }?.name
+
                 Text(text = title, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextDark)
-                Text(text = yarnAndNeedle, fontSize = 13.sp, color = Color.Gray)
+                if (connectedYarnName != null) {
+                    Text(text = "사용 실: $connectedYarnName", fontSize = 13.sp, color = PointOrange)
+                }
+                if (yarnAndNeedle.isNotBlank()) {
+                    Text(text = "바늘: $yarnAndNeedle", fontSize = 13.sp, color = Color.Gray)
+                }
             }
 
             Row(
@@ -226,23 +242,42 @@ fun CounterScreen(
                     color = PointOrange
                 )
 
-                Text(text = "목표 ${totalRows}단", fontSize = 14.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier.fillMaxWidth().height(8.dp),
-                    color = PointOrange,
-                    trackColor = Color(0xFFDCD7C9)
+                Text(
+                    text = if (target != null && target > 0) "목표 ${target}단" else "목표 없음",
+                    fontSize = 14.sp,
+                    color = Color.Gray,
+                    fontWeight = FontWeight.Medium
                 )
 
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(text = "${(progress * 100).toInt()}% 완료", fontSize = 12.sp, color = Color.Gray)
-                    Text(text = "${remainingCount}단 남음", fontSize = 12.sp, color = Color.Gray)
+                if (target != null && target > 0) {
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp),
+                        color = PointOrange,
+                        trackColor = Color(0xFFDCD7C9)
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "${(progress * 100).toInt()}% 완료",
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
+                        Text(
+                            text = "${remainingCount}단 남음",
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
+                    }
                 }
             }
         }
@@ -260,9 +295,14 @@ fun CounterScreen(
                         saveCurrentProjectState(updatedRows = currentRows)
                     }
                 },
-                modifier = Modifier.weight(1f).height(60.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(60.dp),
                 shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = CardBg, contentColor = TextDark)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = CardBg,
+                    contentColor = TextDark
+                )
             ) {
                 Text("—", fontSize = 24.sp, fontWeight = FontWeight.Bold)
             }
@@ -272,9 +312,14 @@ fun CounterScreen(
                     currentRows++
                     saveCurrentProjectState(updatedRows = currentRows)
                 },
-                modifier = Modifier.weight(2f).height(60.dp),
+                modifier = Modifier
+                    .weight(2f)
+                    .height(60.dp),
                 shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = PointOrange, contentColor = Color.White)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = PointOrange,
+                    contentColor = Color.White
+                )
             ) {
                 Text("+ 한 단", fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }
@@ -480,8 +525,17 @@ fun CounterScreen(
             text = {
                 OutlinedTextField(
                     value = newMemoText,
-                    onValueChange = { newMemoText = it },
+                    onValueChange = { if (it.length <= 100) newMemoText = it },
                     placeholder = { Text("예: 40단부터 무늬 반복 시작", fontSize = 13.sp) },
+                    supportingText = {
+                        Text(
+                            text = "${newMemoText.length}/100자",
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.End,
+                            fontSize = 10.sp,
+                            color = Color.Gray
+                        )
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
@@ -491,7 +545,6 @@ fun CounterScreen(
                     onClick = {
                         if (newMemoText.isNotBlank()) {
                             memoList.add(MemoItem(count = currentRows, text = newMemoText))
-                            saveCurrentProjectState()
                             newMemoText = ""
                         }
                         showMemoDialog = false
@@ -519,7 +572,16 @@ fun CounterScreen(
             text = {
                 OutlinedTextField(
                     value = editMemoText,
-                    onValueChange = { editMemoText = it },
+                    onValueChange = { if (it.length <= 100) editMemoText = it },
+                    supportingText = {
+                        Text(
+                            text = "${editMemoText.length}/100자",
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.End,
+                            fontSize = 10.sp,
+                            color = Color.Gray
+                        )
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
@@ -530,7 +592,6 @@ fun CounterScreen(
                         val targetIndex = memoList.indexOfFirst { it.id == editingMemo?.id }
                         if (targetIndex != -1 && editMemoText.isNotBlank()) {
                             memoList[targetIndex] = memoList[targetIndex].copy(text = editMemoText)
-                            saveCurrentProjectState()
                         }
                         editingMemo = null
                     },
@@ -556,7 +617,6 @@ fun CounterScreen(
                 Button(
                     onClick = {
                         memoList.remove(memoToDelete)
-                        saveCurrentProjectState()
                         memoToDelete = null
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
@@ -598,8 +658,9 @@ fun CounterScreen(
     if (showEditDialog) {
         var editTitle by remember { mutableStateOf(title) }
         var editYarnAndNeedle by remember { mutableStateOf(yarnAndNeedle) }
+        var editYarnId by remember { mutableStateOf(yarnId) }
         var editCurrent by remember { mutableStateOf(currentRows.toString()) }
-        var editTarget by remember { mutableStateOf(totalRows.toString()) }
+        var editTarget by remember { mutableStateOf(targetRows?.toString() ?: "") }
         var editStatus by remember { mutableStateOf(status) }
 
         var showYarnSelectDialog by remember { mutableStateOf(false) }
@@ -609,19 +670,30 @@ fun CounterScreen(
             title = { Text("카운터 정보 수정", fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("진행 상황", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                    Text(
+                        "진행 상황",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Gray
+                    )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterChip(
                             selected = editStatus == "진행",
                             onClick = { editStatus = "진행" },
-                            label = { Text("진행 중") },
-                            colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PointOrange, selectedLabelColor = Color.White)
+                            label = { Text("진행") },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = PointOrange,
+                                selectedLabelColor = Color.White
+                            )
                         )
                         FilterChip(
-                            selected = editStatus == "완료",
-                            onClick = { editStatus = "완료" },
-                            label = { Text("완료") },
-                            colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PointOrange, selectedLabelColor = Color.White)
+                            selected = editStatus == "완성",
+                            onClick = { editStatus = "완성" },
+                            label = { Text("완성") },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = PointOrange,
+                                selectedLabelColor = Color.White
+                            )
                         )
                     }
                     OutlinedTextField(
@@ -632,7 +704,7 @@ fun CounterScreen(
                             Text(
                                 text = "${editTitle.length}/50자",
                                 modifier = Modifier.fillMaxWidth(),
-                                textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                                textAlign = TextAlign.End,
                                 fontSize = 10.sp,
                                 color = Color.Gray
                             )
@@ -645,12 +717,12 @@ fun CounterScreen(
                         OutlinedTextField(
                             value = editYarnAndNeedle,
                             onValueChange = { if (it.length <= 50) editYarnAndNeedle = it },
-                            label = { Text("실 · 바늘 정보 (최대 50자)") },
+                            label = { Text("바늘 정보 (예: 4.0mm)") },
                             supportingText = {
                                 Text(
                                     text = "${editYarnAndNeedle.length}/50자",
                                     modifier = Modifier.fillMaxWidth(),
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                                    textAlign = TextAlign.End,
                                     fontSize = 10.sp,
                                     color = Color.Gray
                                 )
@@ -664,16 +736,20 @@ fun CounterScreen(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Icon(Icons.Default.ShoppingBag, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(
+                                Icons.Default.ShoppingBag,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text("실 보관소에서 불러오기", fontSize = 12.sp, color = PointOrange)
                         }
                     }
+
                     OutlinedTextField(
                         value = editCurrent,
                         onValueChange = {
-                            val filtered = it.filter { char -> char.isDigit() }
-                            editCurrent = filtered
+                            editCurrent = it.filter { char -> char.isDigit() }
                         },
                         label = { Text("현재 단수 (0 이상)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -684,10 +760,9 @@ fun CounterScreen(
                     OutlinedTextField(
                         value = editTarget,
                         onValueChange = {
-                            val filtered = it.filter { char -> char.isDigit() }
-                            editTarget = filtered
+                            editTarget = it.filter { char -> char.isDigit() }
                         },
-                        label = { Text("목표 단수 (선택 또는 1 이상)") },
+                        label = { Text("목표 단수 (비우면 목표 없음)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
@@ -697,21 +772,24 @@ fun CounterScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        title = editTitle
-                        yarnAndNeedle = editYarnAndNeedle
-                        currentRows = editCurrent.toIntOrNull()?.coerceAtLeast(0) ?: currentRows
-                        totalRows = editTarget.toIntOrNull()?.coerceAtLeast(0) ?: totalRows
-                        status = editStatus
+                        if (editTitle.isNotBlank()) {
+                            title = editTitle
+                            yarnAndNeedle = editYarnAndNeedle
+                            yarnId = editYarnId
+                            currentRows = editCurrent.toIntOrNull()?.coerceAtLeast(0) ?: currentRows
+                            targetRows = editTarget.toIntOrNull()?.takeIf { it > 0 }
+                            status = editStatus
 
-                        saveCurrentProjectState(
-                            updatedTitle = title,
-                            updatedYarnAndNeedle = yarnAndNeedle,
-                            updatedRows = currentRows,
-                            updatedTotalRows = totalRows,
-                            updatedStatus = status
-                        )
-
-                        showEditDialog = false
+                            saveCurrentProjectState(
+                                updatedTitle = title,
+                                updatedYarnAndNeedle = yarnAndNeedle,
+                                updatedYarnId = yarnId,
+                                updatedRows = currentRows,
+                                updatedTargetRows = targetRows,
+                                updatedStatus = status
+                            )
+                            showEditDialog = false
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = PointOrange)
                 ) {
@@ -731,7 +809,11 @@ fun CounterScreen(
                 title = { Text("실 선택", fontWeight = FontWeight.Bold) },
                 text = {
                     if (yarnList.isEmpty()) {
-                        Text("실 보관소에 등록된 실이 없습니다.\n'실 보관소' 탭에서 실을 먼저 등록해 보세요.", fontSize = 13.sp, color = Color.Gray)
+                        Text(
+                            "실 보관소에 등록된 실이 없습니다.\n'실 보관소' 탭에서 실을 먼저 등록해 보세요.",
+                            fontSize = 13.sp,
+                            color = Color.Gray
+                        )
                     } else {
                         LazyColumn(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -740,14 +822,19 @@ fun CounterScreen(
                             items(yarnList) { yarn ->
                                 Card(
                                     onClick = {
-                                        editYarnAndNeedle = yarn.name
+                                        editYarnId = yarn.id
                                         showYarnSelectDialog = false
                                     },
                                     colors = CardDefaults.cardColors(containerColor = CardBg),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Column(modifier = Modifier.padding(12.dp)) {
-                                        Text(yarn.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextDark)
+                                        Text(
+                                            yarn.name,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp,
+                                            color = TextDark
+                                        )
                                         if (yarn.color.isNotBlank()) {
                                             Text(yarn.color, fontSize = 11.sp, color = Color.Gray)
                                         }
