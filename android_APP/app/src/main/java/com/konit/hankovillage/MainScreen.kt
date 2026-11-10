@@ -23,6 +23,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.konit.hankovillage.network.RetrofitInstance
 import com.konit.hankovillage.ui.auth.LoginScreen
+import com.konit.hankovillage.ui.auth.SignupScreen
 import com.konit.hankovillage.ui.auth.UserSession
 import com.konit.hankovillage.ui.community.CommentData
 import com.konit.hankovillage.ui.community.CommunityCategory
@@ -42,6 +43,9 @@ import kotlinx.coroutines.launch
 
 /**
  * 하단 네비게이션 바의 탭 메뉴 항목 데이터 모델입니다.
+ *
+ * @property title 화면 노출용 탭 이름
+ * @property route 네비게이션 라우트 경로
  */
 sealed class BottomNavItem(val title: String, val route: String) {
     object Home : BottomNavItem("단수카운터", "home")
@@ -53,6 +57,9 @@ sealed class BottomNavItem(val title: String, val route: String) {
 
 /**
  * 앱의 메인 화면 컴포저블입니다.
+ *
+ * 하단 네비게이션 바 제어, 로그인 세션 상태 및 회원가입 흐름 관리,
+ * 프로젝트 API 연동 상태 동기화를 담당합니다.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,6 +70,7 @@ fun MainScreen() {
     val apiService = remember { RetrofitInstance.getApiService(context) }
 
     var currentUserSession by remember { mutableStateOf<UserSession?>(null) }
+    var pendingSignupToken by remember { mutableStateOf<String?>(null) }
     var showLoginAuthDialog by remember { mutableStateOf(false) }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -82,7 +90,6 @@ fun MainScreen() {
         )
     }
 
-    // [실서버 연동] 앱 진입 또는 로그인 세션 변경 시 프로젝트 목록 불러오기 (GET /projects)
     LaunchedEffect(currentUserSession) {
         try {
             val response = apiService.getProjects()
@@ -211,12 +218,12 @@ fun MainScreen() {
                     ProjectListScreen(
                         projectList = projectList,
                         yarnList = yarnList,
-                        // [실서버 연동] 새 프로젝트 생성 (POST /projects)
                         onAddProject = { newProject ->
                             coroutineScope.launch {
                                 try {
                                     val response = apiService.createProject(newProject)
                                     if (response.isSuccessful && response.body() != null) {
+                                        // 서버에서 발급된 고유 ID를 포함한 프로젝트 객체로 목록 최상단에 반영
                                         projectList.add(0, response.body()!!)
                                     } else {
                                         Toast.makeText(context, "생성 실패 (${response.code()})", Toast.LENGTH_SHORT).show()
@@ -226,7 +233,6 @@ fun MainScreen() {
                                 }
                             }
                         },
-                        // [실서버 연동] 프로젝트 삭제 (DELETE /projects/{id})
                         onDeleteProject = { projectToDelete ->
                             coroutineScope.launch {
                                 try {
@@ -251,8 +257,8 @@ fun MainScreen() {
                         project = selectedProject!!,
                         yarnList = yarnList,
                         onBackClick = { selectedProject = null },
-                        // [실서버 연동] 단수 실시간 저장 (PATCH /projects/{id}/counter)
                         onSaveProject = { savedProject ->
+                            // 빠른 반응성을 위해 로컬 상태를 우선 업데이트한 뒤 서버에 동기화 요청
                             val index = projectList.indexOfFirst { it.id == savedProject.id }
                             if (index != -1) {
                                 projectList[index] = savedProject
@@ -290,14 +296,30 @@ fun MainScreen() {
             composable(BottomNavItem.Profile.route) {
                 val currentSession = currentUserSession
                 if (currentSession == null) {
-                    LoginScreen(
-                        onLoginSuccess = { session ->
-                            currentUserSession = session
-                        },
-                        onGuestMode = {
-                            navController.navigate(BottomNavItem.Home.route)
-                        }
-                    )
+                    if (pendingSignupToken != null) {
+                        SignupScreen(
+                            signupToken = pendingSignupToken!!,
+                            onSignupSuccess = { session ->
+                                pendingSignupToken = null
+                                currentUserSession = session
+                            },
+                            onCancelOrExpired = {
+                                pendingSignupToken = null
+                            }
+                        )
+                    } else {
+                        LoginScreen(
+                            onLoginSuccess = { session ->
+                                currentUserSession = session
+                            },
+                            onGuestMode = {
+                                navController.navigate(BottomNavItem.Home.route)
+                            },
+                            onSignupRequired = { signupToken ->
+                                pendingSignupToken = signupToken
+                            }
+                        )
+                    }
                 } else {
                     ProfileScreen(
                         userProfile = currentSession.profile,

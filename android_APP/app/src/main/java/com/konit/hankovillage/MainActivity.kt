@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
 import com.kakao.sdk.common.KakaoSdk
 
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -17,5 +18,6 @@ class MainActivity : ComponentActivity() {
                 MainScreen()
             }
         }
+
     }
 }

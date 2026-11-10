@@ -32,11 +32,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 /**
- * 소셜 로그인 및 둘러보기 선택을 제공하는 화면 컴포저블
+ * 소셜 로그인 및 둘러보기 선택을 제공하는 화면 컴포저블입니다.
  *
  * @param onLoginSuccess 로그인 성공 시 세션 정보를 전달받는 콜백
  * @param onGuestMode 둘러보기 선택 시 실행할 콜백
- * @param onSignupRequired 신규 회원(is_new_user == true)일 때 signup_token을 전달하는 콜백
+ * @param onSignupRequired 신규 회원가입 필요 시 signup_token을 전달하는 콜백
  */
 @Composable
 fun LoginScreen(
@@ -208,7 +208,7 @@ fun LoginScreen(
 }
 
 /**
- * 카카오 소셜 로그인 및 실서버(POST /auth/social/kakao) 연동 핸들러
+ * 카카오 인증 후 백엔드 API와 통신하여 사용자 세션을 처리하는 핸들러입니다.
  */
 private fun handleKakaoLogin(
     context: Context,
@@ -219,13 +219,14 @@ private fun handleKakaoLogin(
 ) {
     val apiService = RetrofitInstance.getApiService(context)
 
-    val callback: (OAuthToken?, Throwable?) -> Unit =  callback@{ token, error ->
+    val callback: (OAuthToken?, Throwable?) -> Unit = callback@{ token, error ->
         if (error != null) {
             Log.e("KakaoAuth", "카카오 SDK 로그인 실패", error)
             onFailure("카카오 로그인에 실패했습니다.")
         } else if (token != null) {
             val idToken = token.idToken
-            // idToken이 null이면 서버에 보내지 않고 로그만 남김
+
+            // 백엔드의 OIDC ID Token 검증을 위해 idToken이 필수이므로 유효성을 우선 확인합니다.
             if (idToken == null) {
                 Log.e("KakaoAuth", "idToken이 null입니다. 카카오 콘솔 OIDC 설정을 확인하세요.")
                 onFailure("카카오 인증 설정을 확인해 주세요.")
@@ -237,6 +238,8 @@ private fun handleKakaoLogin(
                     val response = apiService.socialLoginKakao(SocialLoginRequest(token = idToken))
                     if (response.isSuccessful && response.body() != null) {
                         val body = response.body()!!
+
+                        // 백엔드 판별 결과 신규 회원일 경우 약관 동의 및 프로필 설정을 위해 가입 화면으로 전환합니다.
                         if (body.isNewUser) {
                             val signupToken = body.signupToken
                             if (signupToken != null) {
@@ -245,7 +248,7 @@ private fun handleKakaoLogin(
                                 onFailure("가입 토큰을 받지 못했습니다.")
                             }
                         } else {
-                            // 기존 회원: access_token, refresh_token 저장
+                            // 기존 회원은 보안 인증 토큰을 앱 로컬 스토리지에 저장 후 세션을 시작합니다.
                             context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
                                 .edit()
                                 .putString("access_token", body.accessToken)
@@ -274,16 +277,11 @@ private fun handleKakaoLogin(
         }
     }
 
-   // if (UserApiClient.instance.isKakaoTalkLoginAvailable(context)) {
-   //     UserApiClient.instance.loginWithKakaoTalk(context, callback = callback)
-   // } else {
-   //     UserApiClient.instance.loginWithKakaoAccount(context, callback = callback)
-   // }
     UserApiClient.instance.loginWithKakaoAccount(context, callback = callback)
 }
 
 /**
- * 구글 소셜 로그인 연동 핸들러 (추후 Credential Manager 연동용)
+ * 구글 소셜 로그인 연동 핸들러입니다.
  */
 private fun handleGoogleLogin(
     context: Context,
