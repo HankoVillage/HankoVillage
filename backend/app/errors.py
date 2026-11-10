@@ -52,7 +52,9 @@ async def handle_http_exception(request: Request, exc: StarletteHTTPException) -
 async def handle_validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
     fields: list[str] = []
     for error in exc.errors():
-        name = ".".join(str(part) for part in error["loc"][1:])
+        # loc is like ("body", "nickname"). When the whole body is missing it is just ("body",),
+        # so fall back to the location name instead of leaving fields empty.
+        name = ".".join(str(part) for part in error["loc"][1:]) or str(error["loc"][0])
         if name and name not in fields:
             fields.append(name)
     return problem_response(422, "VALIDATION_ERROR", "입력값을 확인해 주세요", fields)
