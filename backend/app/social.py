@@ -1,4 +1,5 @@
 import logging
+import time
 
 import jwt
 from jwt import PyJWKClient
@@ -35,9 +36,16 @@ def social_provider_unavailable() -> ApiError:
 
 
 def verify_id_token(
-    token: str, jwks: PyJWKClient, issuer: str | tuple[str, ...], audience: str, provider: str
+    token: str,
+    jwks: PyJWKClient,
+    issuer: str | tuple[str, ...],
+    audience: str,
+    provider: str,
+    max_age: int | None = None,
 ) -> str:
     # Checks signature, iss, aud, exp and returns sub. Never log the token itself.
+    # max_age (seconds): also require the token to have been issued recently,
+    # for actions that need a fresh sign-in such as account deletion.
     try:
         kid = jwt.get_unverified_header(token).get("kid")
     except jwt.InvalidTokenError as exc:
@@ -75,16 +83,21 @@ def verify_id_token(
     except jwt.InvalidTokenError as exc:
         raise invalid_social_token() from exc
 
+    if max_age is not None:
+        iat = payload["iat"]
+        if not isinstance(iat, (int, float)) or time.time() - iat > max_age + CLOCK_LEEWAY:
+            raise invalid_social_token()
+
     sub = payload["sub"]
     if not isinstance(sub, str) or not sub:
         raise invalid_social_token()
     return sub
 
 
-def verify_kakao_token(token: str) -> str:
-    return verify_id_token(token, kakao_jwks, KAKAO_ISSUER, settings.kakao_native_app_key, "Kakao")
+def verify_kakao_token(token: str, max_age: int | None = None) -> str:
+    return verify_id_token(token, kakao_jwks, KAKAO_ISSUER, settings.kakao_native_app_key, "Kakao", max_age)
 
 
-def verify_google_token(token: str) -> str:
+def verify_google_token(token: str, max_age: int | None = None) -> str:
     # aud is the web client ID the app passes as serverClientId, not the Android client ID.
-    return verify_id_token(token, google_jwks, GOOGLE_ISSUERS, settings.google_web_client_id, "Google")
+    return verify_id_token(token, google_jwks, GOOGLE_ISSUERS, settings.google_web_client_id, "Google", max_age)
