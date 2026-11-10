@@ -388,9 +388,7 @@ fun YarnDetailContent(
         Spacer(modifier = Modifier.weight(1f))
 
         OutlinedButton(
-            onClick = {
-                deleteCroppedImageFile(context, yarn.imageUrl)
-                showDeleteDialog = true },
+            onClick = { showDeleteDialog = true },
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red),
             border = androidx.compose.foundation.BorderStroke(1.dp, Color.Red)
@@ -417,7 +415,10 @@ fun YarnDetailContent(
             text = { Text("\"${yarn.name}\" 실 정보를 삭제하시겠습니까?") },
             confirmButton = {
                 Button(
-                    onClick = { onDelete(yarn.id) },
+                    onClick = {
+                        deleteCroppedImageFile(context, yarn.imageUrl)
+                        onDelete(yarn.id)
+                    },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
                 ) {
                     Text("삭제", color = Color.White)
@@ -473,7 +474,7 @@ fun YarnUploadDialog(
     }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = handleDismiss,
         title = { Text("새 실 등록", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -600,7 +601,7 @@ fun YarnUploadDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("취소", color = Color.Gray) }
+            TextButton(onClick = handleDismiss) { Text("취소", color = Color.Gray) }
         }
     )
 }
@@ -635,7 +636,8 @@ fun YarnEditDialog(
         if (imageUri != initialImageUri) {
             deleteCroppedImageFile(context, imageUri)
         }
-        onDismiss() }
+        onDismiss()
+    }
 
     if (pendingCropUri != null) {
         ImageCropDialog(
@@ -651,12 +653,8 @@ fun YarnEditDialog(
         )
     }
 
-    if (imageUri != initialImageUri) {
-        deleteCroppedImageFile(context, initialImageUri)
-    }
-
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = handleDismiss,
         title = { Text("실 정보 수정", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -765,6 +763,9 @@ fun YarnEditDialog(
             Button(
                 onClick = {
                     if (name.isNotBlank()) {
+                        if (imageUri != initialImageUri) {
+                            deleteCroppedImageFile(context, initialImageUri)
+                        }
                         onConfirm(
                             yarn.copy(
                                 name = name,
@@ -783,7 +784,7 @@ fun YarnEditDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("취소", color = Color.Gray) }
+            TextButton(onClick = handleDismiss) { Text("취소", color = Color.Gray) }
         }
     )
 }
