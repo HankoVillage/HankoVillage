@@ -333,6 +333,7 @@ fun MainScreen() {
                 } else {
                     ProfileScreen(
                         userProfile = currentSession.profile,
+                        provider = currentSession.provider,
                         postList = postList,
                         patternList = patternList,
                         onUpdateProfile = { updatedProfile ->

@@ -15,13 +15,14 @@ import retrofit2.http.Path
  * 한코마을 백엔드 RESTful API 통신 인터페이스입니다.
  */
 interface HankoApiService {
-
+    @POST("users/me/withdrawal")
+    suspend fun withdrawUser(
+        @Body request: SocialLoginRequest
+    ): Response<Unit>
     @POST("auth/refresh")
     suspend fun refreshTokens(@Body request: RefreshRequest): Response<RefreshResponse>
-
     @POST("auth/logout")
     suspend fun logout(@Body request: RefreshRequest): Response<Unit>
-
     @POST("auth/social/google")
     suspend fun socialLoginGoogle(
         @Body request: SocialLoginRequest
