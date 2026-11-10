@@ -416,8 +416,8 @@ fun YarnDetailContent(
             confirmButton = {
                 Button(
                     onClick = {
-                        deleteCroppedImageFile(context, yarn.imageUrl)
-                        onDelete(yarn.id)
+                        deleteCroppedImageFile( context, yarn.imageUrl )
+                        onDelete( yarn.id )
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
                 ) {
