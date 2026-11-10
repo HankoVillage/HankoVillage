@@ -1,5 +1,6 @@
 package com.konit.hankovillage
 
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -14,12 +15,13 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.konit.hankovillage.network.RetrofitInstance
 import com.konit.hankovillage.ui.auth.LoginScreen
 import com.konit.hankovillage.ui.auth.UserSession
 import com.konit.hankovillage.ui.community.CommentData
@@ -27,6 +29,7 @@ import com.konit.hankovillage.ui.community.CommunityCategory
 import com.konit.hankovillage.ui.community.CommunityScreen
 import com.konit.hankovillage.ui.community.PostData
 import com.konit.hankovillage.ui.counter.CounterScreen
+import com.konit.hankovillage.ui.counter.ProjectCounterUpdateRequest
 import com.konit.hankovillage.ui.counter.ProjectData
 import com.konit.hankovillage.ui.counter.ProjectDataSaver
 import com.konit.hankovillage.ui.counter.ProjectListScreen
@@ -35,12 +38,10 @@ import com.konit.hankovillage.ui.pattern.PatternScreen
 import com.konit.hankovillage.ui.profile.ProfileScreen
 import com.konit.hankovillage.ui.yarn.YarnData
 import com.konit.hankovillage.ui.yarn.YarnScreen
+import kotlinx.coroutines.launch
 
 /**
  * 하단 네비게이션 바의 탭 메뉴 항목 데이터 모델입니다.
- *
- * @property title 화면 노출용 탭 이름
- * @property route 네비게이션 라우트 경로
  */
 sealed class BottomNavItem(val title: String, val route: String) {
     object Home : BottomNavItem("단수카운터", "home")
@@ -52,13 +53,14 @@ sealed class BottomNavItem(val title: String, val route: String) {
 
 /**
  * 앱의 메인 화면 컴포저블입니다.
- *
- * 하단 네비게이션 바 제어, 로그인 세션 상태 관리 및 탭 이동 제어, 비회원 권한 제한 다이얼로그 처리를 담당합니다.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen() {
     val navController = rememberNavController()
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val apiService = remember { RetrofitInstance.getApiService(context) }
 
     var currentUserSession by remember { mutableStateOf<UserSession?>(null) }
     var showLoginAuthDialog by remember { mutableStateOf(false) }
@@ -78,6 +80,21 @@ fun MainScreen() {
                 status = "in_progress"
             )
         )
+    }
+
+    // [실서버 연동] 앱 진입 또는 로그인 세션 변경 시 프로젝트 목록 불러오기 (GET /projects)
+    LaunchedEffect(currentUserSession) {
+        try {
+            val response = apiService.getProjects()
+            if (response.isSuccessful) {
+                response.body()?.let { serverList ->
+                    projectList.clear()
+                    projectList.addAll(serverList)
+                }
+            }
+        } catch (e: Exception) {
+            Toast.makeText(context, "목록 불러오기 실패: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
     }
 
     val yarnList = remember { mutableStateListOf<YarnData>() }
@@ -194,10 +211,36 @@ fun MainScreen() {
                     ProjectListScreen(
                         projectList = projectList,
                         yarnList = yarnList,
+                        // [실서버 연동] 새 프로젝트 생성 (POST /projects)
                         onAddProject = { newProject ->
-                            projectList.add(0, newProject)
+                            coroutineScope.launch {
+                                try {
+                                    val response = apiService.createProject(newProject)
+                                    if (response.isSuccessful && response.body() != null) {
+                                        projectList.add(0, response.body()!!)
+                                    } else {
+                                        Toast.makeText(context, "생성 실패 (${response.code()})", Toast.LENGTH_SHORT).show()
+                                    }
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "네트워크 오류: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            }
                         },
-                        onDeleteProject = { projectToDelete -> projectList.remove(projectToDelete) },
+                        // [실서버 연동] 프로젝트 삭제 (DELETE /projects/{id})
+                        onDeleteProject = { projectToDelete ->
+                            coroutineScope.launch {
+                                try {
+                                    val response = apiService.deleteProject(projectToDelete.id)
+                                    if (response.isSuccessful) {
+                                        projectList.remove(projectToDelete)
+                                    } else {
+                                        Toast.makeText(context, "삭제 실패 (${response.code()})", Toast.LENGTH_SHORT).show()
+                                    }
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "네트워크 오류: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
                         onProjectSelect = { project -> selectedProject = project }
                     )
                 } else {
@@ -208,6 +251,7 @@ fun MainScreen() {
                         project = selectedProject!!,
                         yarnList = yarnList,
                         onBackClick = { selectedProject = null },
+                        // [실서버 연동] 단수 실시간 저장 (PATCH /projects/{id}/counter)
                         onSaveProject = { savedProject ->
                             val index = projectList.indexOfFirst { it.id == savedProject.id }
                             if (index != -1) {
@@ -216,6 +260,17 @@ fun MainScreen() {
                                 projectList.add(0, savedProject)
                             }
                             selectedProject = savedProject
+
+                            coroutineScope.launch {
+                                try {
+                                    apiService.updateProjectCounter(
+                                        projectId = savedProject.id,
+                                        request = ProjectCounterUpdateRequest(currentRow = savedProject.currentRows)
+                                    )
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "단수 저장 실패: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            }
                         }
                     )
                 }

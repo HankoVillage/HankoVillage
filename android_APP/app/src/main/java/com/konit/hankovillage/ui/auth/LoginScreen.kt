@@ -1,6 +1,7 @@
 package com.konit.hankovillage.ui.auth
 
 import android.content.Context
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -15,6 +16,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kakao.sdk.auth.model.OAuthToken
+import com.kakao.sdk.user.UserApiClient
+import com.konit.hankovillage.network.RetrofitInstance
+import com.konit.hankovillage.network.SocialLoginRequest
 import com.konit.hankovillage.ui.profile.UserProfileData
 import com.konit.hankovillage.ui.theme.BgColor
 import com.konit.hankovillage.ui.theme.GoogleBg
@@ -23,20 +28,24 @@ import com.konit.hankovillage.ui.theme.KakaoText
 import com.konit.hankovillage.ui.theme.KakaoYellow
 import com.konit.hankovillage.ui.theme.PointOrange
 import com.konit.hankovillage.ui.theme.TextDark
-
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 /**
  * 소셜 로그인 및 둘러보기 선택을 제공하는 화면 컴포저블
  *
  * @param onLoginSuccess 로그인 성공 시 세션 정보를 전달받는 콜백
  * @param onGuestMode 둘러보기 선택 시 실행할 콜백
+ * @param onSignupRequired 신규 회원(is_new_user == true)일 때 signup_token을 전달하는 콜백
  */
 @Composable
 fun LoginScreen(
     onLoginSuccess: (UserSession) -> Unit,
-    onGuestMode: () -> Unit
+    onGuestMode: () -> Unit,
+    onSignupRequired: (signupToken: String) -> Unit = {}
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     var isLoading by remember { mutableStateOf(false) }
 
     Column(
@@ -81,12 +90,13 @@ fun LoginScreen(
                     isLoading = true
                     handleKakaoLogin(
                         context = context,
-                        onSuccess = { email, nickname, profileImage ->
+                        coroutineScope = coroutineScope,
+                        onSuccess = { userId, nickname, profileImage ->
                             isLoading = false
                             val session = UserSession(
-                                userId = email,
+                                userId = userId,
                                 provider = "kakao",
-                                providerId = email,
+                                providerId = userId,
                                 profile = UserProfileData(
                                     nickname = nickname,
                                     bio = "카카오로 로그인한 뜨개이웃",
@@ -96,12 +106,17 @@ fun LoginScreen(
                             Toast.makeText(context, "${nickname}님 환영합니다!", Toast.LENGTH_SHORT).show()
                             onLoginSuccess(session)
                         },
-                        onFailure = {
+                        onNewUser = { signupToken ->
                             isLoading = false
-                            Toast.makeText(context, "카카오 로그인 실패: ${it.message}", Toast.LENGTH_SHORT).show()
+                            onSignupRequired(signupToken)
+                        },
+                        onFailure = { message ->
+                            isLoading = false
+                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                         }
                     )
                 },
+                enabled = !isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
@@ -151,6 +166,7 @@ fun LoginScreen(
                         }
                     )
                 },
+                enabled = !isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
@@ -192,18 +208,82 @@ fun LoginScreen(
 }
 
 /**
- * 카카오 소셜 로그인 연동 핸들러
+ * 카카오 소셜 로그인 및 실서버(POST /auth/social/kakao) 연동 핸들러
  */
 private fun handleKakaoLogin(
     context: Context,
-    onSuccess: (email: String, nickname: String, profileImage: String?) -> Unit,
-    onFailure: (Throwable) -> Unit
+    coroutineScope: CoroutineScope,
+    onSuccess: (userId: String, nickname: String, profileImage: String?) -> Unit,
+    onNewUser: (signupToken: String) -> Unit,
+    onFailure: (String) -> Unit
 ) {
-    onSuccess("kakao_knitter@kakao.com", "카카오뜨개러", null)
+    val apiService = RetrofitInstance.getApiService(context)
+
+    val callback: (OAuthToken?, Throwable?) -> Unit =  callback@{ token, error ->
+        if (error != null) {
+            Log.e("KakaoAuth", "카카오 SDK 로그인 실패", error)
+            onFailure("카카오 로그인에 실패했습니다.")
+        } else if (token != null) {
+            val idToken = token.idToken
+            // idToken이 null이면 서버에 보내지 않고 로그만 남김
+            if (idToken == null) {
+                Log.e("KakaoAuth", "idToken이 null입니다. 카카오 콘솔 OIDC 설정을 확인하세요.")
+                onFailure("카카오 인증 설정을 확인해 주세요.")
+                return@callback
+            }
+
+            coroutineScope.launch {
+                try {
+                    val response = apiService.socialLoginKakao(SocialLoginRequest(token = idToken))
+                    if (response.isSuccessful && response.body() != null) {
+                        val body = response.body()!!
+                        if (body.isNewUser) {
+                            val signupToken = body.signupToken
+                            if (signupToken != null) {
+                                onNewUser(signupToken)
+                            } else {
+                                onFailure("가입 토큰을 받지 못했습니다.")
+                            }
+                        } else {
+                            // 기존 회원: access_token, refresh_token 저장
+                            context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+                                .edit()
+                                .putString("access_token", body.accessToken)
+                                .putString("refresh_token", body.refreshToken)
+                                .apply()
+
+                            onSuccess(
+                                body.user?.id?.toString() ?: "",
+                                body.user?.nickname ?: "뜨개이웃",
+                                null
+                            )
+                        }
+                    } else {
+                        when (response.code()) {
+                            401 -> onFailure("인증에 실패했습니다. 카카오 로그인을 다시 시도해 주세요.")
+                            409 -> onFailure("이미 가입된 계정입니다. 카카오 로그인을 다시 시도해 주세요.")
+                            503 -> onFailure("잠시 후 다시 시도해 주세요.")
+                            else -> onFailure("로그인 실패 (${response.code()})")
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("KakaoAuth", "서버 로그인 통신 오류", e)
+                    onFailure("서버 통신이 원활하지 않습니다. 잠시 후 다시 시도해 주세요.")
+                }
+            }
+        }
+    }
+
+   // if (UserApiClient.instance.isKakaoTalkLoginAvailable(context)) {
+   //     UserApiClient.instance.loginWithKakaoTalk(context, callback = callback)
+   // } else {
+   //     UserApiClient.instance.loginWithKakaoAccount(context, callback = callback)
+   // }
+    UserApiClient.instance.loginWithKakaoAccount(context, callback = callback)
 }
 
 /**
- * 구글 소셜 로그인 연동 핸들러
+ * 구글 소셜 로그인 연동 핸들러 (추후 Credential Manager 연동용)
  */
 private fun handleGoogleLogin(
     context: Context,
