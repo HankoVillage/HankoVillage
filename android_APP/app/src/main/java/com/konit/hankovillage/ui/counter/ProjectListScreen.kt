@@ -90,8 +90,10 @@ fun ProjectListScreen(
                 modifier = Modifier.weight(1f)
             ) {
                 items(projectList, key = { it.id }) { project ->
+                    val connectedYarnName = yarnList.find { it.id == project.yarnId }?.name
                     ProjectCardItem(
                         project = project,
+                        yarnName = connectedYarnName,
                         onClick = { onProjectSelect(project) },
                         onDelete = { onDeleteProject(project) }
                     )
@@ -110,6 +112,7 @@ fun ProjectListScreen(
 
         val parsedTarget = targetRowInput.toIntOrNull()
         val isTargetInvalid = targetRowInput.isNotBlank() && (parsedTarget == null || parsedTarget < 1)
+        val selectedYarn = yarnList.find { it.id == selectedYarnId }
 
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
@@ -149,11 +152,34 @@ fun ProjectListScreen(
                         OutlinedTextField(
                             value = needleInput,
                             onValueChange = { if (it.length <= 50) needleInput = it },
-                            label = { Text("실 · 바늘 상세 정보 (예: 메리노울 / 4.0mm)") },
+                            label = { Text("바늘 정보 (예: 4.0mm)") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = if (selectedYarn != null) "선택된 실: ${selectedYarn.name}" else "선택된 실: 없음",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (selectedYarn != null) PointOrange else Color.Gray,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (selectedYarn != null) {
+                                TextButton(
+                                    onClick = { selectedYarnId = null },
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
+                                ) {
+                                    Text("선택 해제", fontSize = 11.sp, color = Color.Gray)
+                                }
+                            }
+                        }
+
                         OutlinedButton(
                             onClick = { showYarnSelectDialog = true },
                             modifier = Modifier.fillMaxWidth(),
@@ -237,11 +263,12 @@ fun ProjectListScreen(
                             items(yarnList) { yarn ->
                                 Card(
                                     onClick = {
-                                        needleInput = yarn.name.take(50)
                                         selectedYarnId = yarn.id
                                         showYarnSelectDialog = false
                                     },
-                                    colors = CardDefaults.cardColors(containerColor = CardBg),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (selectedYarnId == yarn.id) PointOrange.copy(alpha = 0.15f) else CardBg
+                                    ),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Column(modifier = Modifier.padding(12.dp)) {
@@ -271,6 +298,7 @@ fun ProjectListScreen(
 @Composable
 fun ProjectCardItem(
     project: ProjectData,
+    yarnName: String? = null,
     onClick: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -330,12 +358,22 @@ fun ProjectCardItem(
                     color = TextDark,
                     maxLines = 1
                 )
-                Text(
-                    text = project.needle ?: "",
-                    fontSize = 11.sp,
-                    color = Color.Gray,
-                    maxLines = 1
-                )
+                if (!yarnName.isNullOrBlank()) {
+                    Text(
+                        text = "실: $yarnName",
+                        fontSize = 11.sp,
+                        color = PointOrange,
+                        maxLines = 1
+                    )
+                }
+                if (!project.needle.isNullOrBlank()) {
+                    Text(
+                        text = "바늘: ${project.needle}",
+                        fontSize = 11.sp,
+                        color = Color.Gray,
+                        maxLines = 1
+                    )
+                }
                 Spacer(modifier = Modifier.height(4.dp))
                 val targetText = project.targetRows?.let { "${it}단" } ?: "자율"
                 Text(

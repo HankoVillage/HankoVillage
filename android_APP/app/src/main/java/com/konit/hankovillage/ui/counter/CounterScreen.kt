@@ -152,9 +152,14 @@ fun CounterScreen(
                     color = PointOrange,
                     fontWeight = FontWeight.Bold
                 )
+                val connectedYarnName = yarnList.find { it.id == yarnId }?.name
+
                 Text(text = title, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextDark)
+                if (connectedYarnName != null) {
+                    Text(text = "사용 실: $connectedYarnName", fontSize = 13.sp, color = PointOrange)
+                }
                 if (yarnAndNeedle.isNotBlank()) {
-                    Text(text = yarnAndNeedle, fontSize = 13.sp, color = Color.Gray)
+                    Text(text = "바늘: $yarnAndNeedle", fontSize = 13.sp, color = Color.Gray)
                 }
             }
 
@@ -712,7 +717,7 @@ fun CounterScreen(
                         OutlinedTextField(
                             value = editYarnAndNeedle,
                             onValueChange = { if (it.length <= 50) editYarnAndNeedle = it },
-                            label = { Text("실 · 바늘 정보 (최대 50자)") },
+                            label = { Text("바늘 정보 (예: 4.0mm)") },
                             supportingText = {
                                 Text(
                                     text = "${editYarnAndNeedle.length}/50자",
@@ -817,7 +822,6 @@ fun CounterScreen(
                             items(yarnList) { yarn ->
                                 Card(
                                     onClick = {
-                                        editYarnAndNeedle = yarn.name.take(50)
                                         editYarnId = yarn.id
                                         showYarnSelectDialog = false
                                     },
