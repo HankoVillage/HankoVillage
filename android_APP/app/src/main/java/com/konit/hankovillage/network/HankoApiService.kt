@@ -16,6 +16,12 @@ import retrofit2.http.Path
  */
 interface HankoApiService {
 
+    @POST("auth/refresh")
+    suspend fun refreshTokens(@Body request: RefreshRequest): Response<RefreshResponse>
+
+    @POST("auth/logout")
+    suspend fun logout(@Body request: RefreshRequest): Response<Unit>
+
     /**
      * 카카오 임시 가입 토큰과 사용자 입력 프로필 정보를 전달하여 최종 회원가입을 완료합니다.
      */
@@ -101,6 +107,7 @@ data class SocialLoginResponse(
 
     @SerializedName("signup_expires_in")
     val signupExpiresIn: Int? = null
+
 )
 
 /**
@@ -126,4 +133,15 @@ data class SignupRequest(
 
     @SerializedName("terms_agreed")
     val termsAgreed: Boolean = true
+)
+
+data class RefreshRequest(
+    @SerializedName("refresh_token") val refreshToken: String
+)
+
+data class RefreshResponse(
+    @SerializedName("access_token") val accessToken: String,
+    @SerializedName("refresh_token") val refreshToken: String,
+    @SerializedName("token_type") val tokenType: String,
+    @SerializedName("expires_in") val expiresIn: Int
 )

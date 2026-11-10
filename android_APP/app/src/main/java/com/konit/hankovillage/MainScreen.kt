@@ -22,6 +22,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.konit.hankovillage.network.RetrofitInstance
+import com.konit.hankovillage.network.SessionManager
+import com.konit.hankovillage.network.RefreshRequest
 import com.konit.hankovillage.ui.auth.LoginScreen
 import com.konit.hankovillage.ui.auth.SignupScreen
 import com.konit.hankovillage.ui.auth.UserSession
@@ -144,6 +146,14 @@ fun MainScreen() {
             popUpTo(navController.graph.startDestinationId) { saveState = true }
             launchSingleTop = true
             restoreState = true
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        SessionManager.sessionExpiredEvent.collect {
+            currentUserSession = null
+            Toast.makeText(context, "로그인이 만료되었습니다. 다시 로그인해 주세요.", Toast.LENGTH_SHORT).show()
+            navigateToProfile()
         }
     }
 
@@ -329,8 +339,19 @@ fun MainScreen() {
                             currentUserSession = currentUserSession?.copy(profile = updatedProfile)
                         },
                         onLogout = {
+                            val refreshToken = SessionManager.getRefreshToken(context)
+                            SessionManager.clearTokens(context)
                             currentUserSession = null
                             navController.navigate(BottomNavItem.Home.route)
+
+                            if (!refreshToken.isNullOrEmpty()) {
+                                coroutineScope.launch {
+                                    try {
+                                        apiService.logout(RefreshRequest(refreshToken))
+                                    } catch (_: Exception) {
+                                    }
+                                }
+                            }
                         }
                     )
                 }

@@ -21,6 +21,7 @@ object RetrofitInstance {
     private fun getOkHttpClient(context: Context): OkHttpClient {
         return okHttpClient ?: OkHttpClient.Builder()
             .addInterceptor(AuthInterceptor(context.applicationContext))
+            .authenticator(TokenAuthenticator(context.applicationContext))
             .build()
             .also { okHttpClient = it }
     }
