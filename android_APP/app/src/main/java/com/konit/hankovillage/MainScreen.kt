@@ -343,6 +343,10 @@ fun MainScreen() {
                             val refreshToken = SessionManager.getRefreshToken(context)
                             SessionManager.clearTokens(context)
                             currentUserSession = null
+
+                            projectList.clear()
+                            selectedProject = null
+
                             navController.navigate(BottomNavItem.Home.route)
 
                             if (!refreshToken.isNullOrEmpty()) {
@@ -353,6 +357,15 @@ fun MainScreen() {
                                     }
                                 }
                             }
+                        },
+                        onWithdrawSuccess = {
+                            SessionManager.clearTokens(context)
+                            currentUserSession = null
+
+                            projectList.clear()
+                            selectedProject = null
+
+                            navigateToProfile()
                         }
                     )
                 }
