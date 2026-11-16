@@ -1,5 +1,6 @@
 package com.konit.hankovillage
 
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,10 +18,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.credentials.ClearCredentialStateRequest
+import androidx.credentials.CredentialManager
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.kakao.sdk.user.UserApiClient
 import com.konit.hankovillage.network.RefreshRequest
 import com.konit.hankovillage.network.RetrofitInstance
 import com.konit.hankovillage.network.SessionManager
@@ -354,9 +358,31 @@ fun MainScreen() {
                         },
                         onLogout = {
                             val refreshToken = SessionManager.getRefreshToken(context)
+                            val provider = currentSession.provider
+
+                            // 1. 앱 세션 및 메모리 데이터 즉시 초기화
                             clearUserSessionData()
                             navController.navigate(BottomNavItem.Home.route)
 
+                            // 2. 소셜 SDK 로컬 세션 캐시 초기화 (다음 로그인 시 계정 선택 가능)
+                            if (provider == "kakao") {
+                                UserApiClient.instance.logout { error ->
+                                    if (error != null) {
+                                        Log.e("KakaoAuth", "카카오 SDK 로그아웃 실패", error)
+                                    }
+                                }
+                            } else if (provider == "google") {
+                                coroutineScope.launch {
+                                    try {
+                                        CredentialManager.create(context)
+                                            .clearCredentialState(ClearCredentialStateRequest())
+                                    } catch (e: Exception) {
+                                        Log.e("GoogleAuth", "구글 자격 증명 캐시 초기화 실패", e)
+                                    }
+                                }
+                            }
+
+                            // 3. 백엔드 서버 로그아웃 요청
                             if (!refreshToken.isNullOrEmpty()) {
                                 coroutineScope.launch {
                                     try {
