@@ -1,5 +1,6 @@
 from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import URL
 
 MIN_SECRET_LENGTH = 43
 PLACEHOLDER_PREFIX = "change-me"
@@ -10,7 +11,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(hide_input_in_errors=True)
 
     postgres_user: str
-    postgres_password: str
+    postgres_password: SecretStr
     postgres_db: str
     db_host: str = "db"
     db_port: int = 5432
@@ -22,11 +23,24 @@ class Settings(BaseSettings):
     google_web_client_id: str
 
     @property
-    def database_url(self) -> str:
-        return (
-            f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}"
-            f"@{self.db_host}:{self.db_port}/{self.postgres_db}"
+    def database_url(self) -> URL:
+        # URL.create escapes special characters (@ : / #) in the password,
+        # and str() of the result hides the password as ***.
+        return URL.create(
+            drivername="postgresql+psycopg",
+            username=self.postgres_user,
+            password=self.postgres_password.get_secret_value(),
+            host=self.db_host,
+            port=self.db_port,
+            database=self.postgres_db,
         )
+
+    @model_validator(mode="after")
+    def check_postgres_password(self) -> "Settings":
+        value = self.postgres_password.get_secret_value()
+        if not value or value.startswith(PLACEHOLDER_PREFIX):
+            raise ValueError("POSTGRES_PASSWORD is still empty or the placeholder value from .env.example. Replace it with a random value.")
+        return self
 
     @model_validator(mode="after")
     def check_jwt_secrets(self) -> "Settings":
