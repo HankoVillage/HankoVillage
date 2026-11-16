@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -11,6 +12,8 @@ from app.tokens import (
     hash_refresh_token,
     new_refresh_token,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class InvalidRefreshToken(Exception):
@@ -65,11 +68,24 @@ def rotate_session(db: Session, refresh_token: str) -> tuple[str, str]:
     ).first()
 
     if claimed is None:
-        session_id = db.scalars(
-            select(RefreshToken.session_id).where(RefreshToken.token_hash == token_hash)
+        row = db.execute(
+            select(RefreshToken.session_id, RefreshToken.user_id, RefreshToken.used_at)
+            .where(RefreshToken.token_hash == token_hash)
         ).first()
-        if session_id is not None:
-            # Reused (possible theft) or expired: end the whole session.
+        if row is not None:
+            session_id, user_id, used_at = row
+            # Reused (possible theft, or the app lost the previous refresh response)
+            # or expired: end the whole session.
+            if used_at is not None:
+                # Seconds between the first use and this reuse. A few seconds suggests
+                # a lost response or a double request; much longer suggests theft.
+                logger.warning(
+                    "Refresh token reused, session ended: user_id=%s seconds_since_use=%d",
+                    user_id,
+                    (now - used_at).total_seconds(),
+                )
+            else:
+                logger.info("Refresh token expired, session ended: user_id=%s", user_id)
             _delete_session_rows(db, session_id)
         raise InvalidRefreshToken()
 
