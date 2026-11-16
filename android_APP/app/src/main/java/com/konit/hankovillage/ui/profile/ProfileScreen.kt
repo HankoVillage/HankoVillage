@@ -447,59 +447,88 @@ private fun executeWithdrawal(
 ) {
     val apiService = RetrofitInstance.getApiService(context)
 
+    // 2단계: 새로 발급받은 ID 토큰으로 서버 탈퇴 요청 → 3단계: 204면 연결 끊기 → 4단계: 토큰 삭제(onSuccess)
     fun requestWithdrawToServer(idToken: String) {
         coroutineScope.launch {
             try {
                 val response = apiService.withdrawUser(SocialLoginRequest(token = idToken))
 
-                when {
-                    // 204 No Content: 정상 탈퇴 완료
-                    response.isSuccessful -> {
-                        if (provider == "kakao") {
-                            UserApiClient.instance.unlink { /* 연결 끊기 완료 */ }
-                        } else if (provider == "google") {
-                            try {
-                                CredentialManager.create(context)
-                                    .clearCredentialState(ClearCredentialStateRequest())
-                            } catch (_: Exception) {}
+                if (response.code() == 204) {
+                    if (provider == "kakao") {
+                        // 204 성공 후 카카오 연결 끊기(unlink) 실행 후 로컬 토큰 삭제(onSuccess)
+                        UserApiClient.instance.unlink { _ ->
+                            onSuccess()
                         }
+                    } else if (provider == "google") {
+                        try {
+                            CredentialManager.create(context)
+                                .clearCredentialState(androidx.credentials.ClearCredentialStateRequest())
+                        } catch (_: Exception) {}
+                        onSuccess()
+                    } else {
                         onSuccess()
                     }
-                    // 401 Unauthorized: 이미 탈퇴된 뒤 재시도한 경우 탈퇴 완료로 처리
-                    response.code() == 401 -> {
-                        onSuccess()
+                } else {
+                    // 204가 아니면 연결 끊기나 토큰 삭제를 하지 않고 오류 메시지 표시
+                    val errorJson = response.errorBody()?.string()
+                    val detailMessage = try {
+                        org.json.JSONObject(errorJson ?: "").optString("detail")
+                    } catch (_: Exception) {
+                        ""
                     }
-                    // 403 REAUTH_FAILED: detail 문구 파싱 후 재로그인 유도
-                    response.code() == 403 -> {
-                        val errorJson = response.errorBody()?.string()
-                        val detail = try {
-                            JSONObject(errorJson ?: "").optString("detail")
-                                .ifEmpty { "재인증에 실패했습니다. 다시 로그인해 주세요." }
-                        } catch (_: Exception) {
-                            "재인증에 실패했습니다. 다시 로그인해 주세요."
+
+                    when (response.code()) {
+                        403 -> {
+                            val msg = detailMessage.ifEmpty { "다시 로그인해 주세요." }
+                            onReauthFailed(msg)
                         }
-                        onReauthFailed(detail)
-                    }
-                    else -> {
-                        onFailure("탈퇴 처리 실패 (${response.code()})")
+                        401 -> {
+                            val msg = detailMessage.ifEmpty { "인증이 만료되었습니다. 다시 시도해 주세요." }
+                            onFailure(msg)
+                        }
+                        else -> {
+                            val msg = detailMessage.ifEmpty { "탈퇴 처리에 실패했습니다. (${response.code()})" }
+                            onFailure(msg)
+                        }
                     }
                 }
             } catch (e: Exception) {
-                onFailure("네트워크 오류가 발생했습니다.")
+                onFailure("네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.")
             }
         }
     }
 
+    // 1단계: 탈퇴 버튼 클릭 시점마다 소셜 재로그인으로 새 ID 토큰 발급
     when (provider) {
         "kakao" -> {
-            UserApiClient.instance.loginWithKakaoAccount(context) { token, error ->
+            val callback: (com.kakao.sdk.auth.model.OAuthToken?, Throwable?) -> Unit = { token, error ->
                 if (error != null || token?.idToken == null) {
                     onFailure("카카오 재인증에 실패했습니다.")
                 } else {
                     requestWithdrawToServer(token.idToken!!)
                 }
             }
+
+            if (UserApiClient.instance.isKakaoTalkLoginAvailable(context)) {
+                UserApiClient.instance.loginWithKakaoTalk(context) { token, error ->
+                    if (error != null) {
+                        // 사용자가 직접 취소한 경우가 아니면 카카오계정 웹 로그인으로 폴백
+                        if (error is com.kakao.sdk.common.model.ClientError &&
+                            error.reason == com.kakao.sdk.common.model.ClientErrorCause.Cancelled
+                        ) {
+                            onFailure("카카오 재인증이 취소되었습니다.")
+                        } else {
+                            UserApiClient.instance.loginWithKakaoAccount(context, callback = callback)
+                        }
+                    } else {
+                        callback(token, null)
+                    }
+                }
+            } else {
+                UserApiClient.instance.loginWithKakaoAccount(context, callback = callback)
+            }
         }
+
         "google" -> {
             val credentialManager = CredentialManager.create(context)
             val googleIdOption = GetGoogleIdOption.Builder()
@@ -513,6 +542,13 @@ private fun executeWithdrawal(
 
             coroutineScope.launch {
                 try {
+                    // 캐시된 기존 로그인 ID 토큰을 비워서 새 ID 토큰이 발급되도록 강제
+                    try {
+                        credentialManager.clearCredentialState(
+                            androidx.credentials.ClearCredentialStateRequest()
+                        )
+                    } catch (_: Exception) {}
+
                     val result = credentialManager.getCredential(request = request, context = context)
                     val credential = result.credential
                     if (credential is CustomCredential &&
@@ -528,9 +564,8 @@ private fun executeWithdrawal(
                 }
             }
         }
-        else -> {
-            onFailure("지원하지 않는 로그인 방식입니다.")
-        }
+
+        else -> onFailure("지원하지 않는 로그인 방식입니다.")
     }
 }
 
