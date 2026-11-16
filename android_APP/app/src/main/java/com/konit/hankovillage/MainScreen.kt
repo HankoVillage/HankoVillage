@@ -21,9 +21,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.konit.hankovillage.network.RefreshRequest
 import com.konit.hankovillage.network.RetrofitInstance
 import com.konit.hankovillage.network.SessionManager
-import com.konit.hankovillage.network.RefreshRequest
 import com.konit.hankovillage.ui.auth.LoginScreen
 import com.konit.hankovillage.ui.auth.SignupScreen
 import com.konit.hankovillage.ui.auth.UserSession
@@ -138,6 +138,19 @@ fun MainScreen() {
         mutableStateOf<ProjectData?>(null)
     }
 
+    // 로그아웃·회원 탈퇴·세션 만료 시 사용자 개인 데이터 및 이전 계정 상태 일괄 초기화
+    fun clearUserSessionData() {
+        SessionManager.clearTokens(context)
+        currentUserSession = null
+        pendingSignupToken = null
+
+        projectList.clear()
+        selectedProject = null
+        yarnList.clear()
+        patternList.clear()
+        postList.clear()
+    }
+
     val appBgColor = Color(0xFFF7F4EB)
     val pointOrangeColor = Color(0xFFD36D33)
 
@@ -151,7 +164,7 @@ fun MainScreen() {
 
     LaunchedEffect(Unit) {
         SessionManager.sessionExpiredEvent.collect {
-            currentUserSession = null
+            clearUserSessionData()
             Toast.makeText(context, "로그인이 만료되었습니다. 다시 로그인해 주세요.", Toast.LENGTH_SHORT).show()
             navigateToProfile()
         }
@@ -341,12 +354,7 @@ fun MainScreen() {
                         },
                         onLogout = {
                             val refreshToken = SessionManager.getRefreshToken(context)
-                            SessionManager.clearTokens(context)
-                            currentUserSession = null
-
-                            projectList.clear()
-                            selectedProject = null
-
+                            clearUserSessionData()
                             navController.navigate(BottomNavItem.Home.route)
 
                             if (!refreshToken.isNullOrEmpty()) {
@@ -359,12 +367,7 @@ fun MainScreen() {
                             }
                         },
                         onWithdrawSuccess = {
-                            SessionManager.clearTokens(context)
-                            currentUserSession = null
-
-                            projectList.clear()
-                            selectedProject = null
-
+                            clearUserSessionData()
                             navigateToProfile()
                         }
                     )
