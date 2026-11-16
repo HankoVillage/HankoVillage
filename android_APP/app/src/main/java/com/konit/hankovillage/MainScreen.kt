@@ -142,7 +142,6 @@ fun MainScreen() {
         mutableStateOf<ProjectData?>(null)
     }
 
-    // 로그아웃·회원 탈퇴·세션 만료 시 사용자 개인 데이터 및 이전 계정 상태 일괄 초기화
     fun clearUserSessionData() {
         SessionManager.clearTokens(context)
         currentUserSession = null
@@ -250,7 +249,6 @@ fun MainScreen() {
                                 try {
                                     val response = apiService.createProject(newProject)
                                     if (response.isSuccessful && response.body() != null) {
-                                        // 서버에서 발급된 고유 ID를 포함한 프로젝트 객체로 목록 최상단에 반영
                                         projectList.add(0, response.body()!!)
                                     } else {
                                         Toast.makeText(context, "생성 실패 (${response.code()})", Toast.LENGTH_SHORT).show()
@@ -285,7 +283,6 @@ fun MainScreen() {
                         yarnList = yarnList,
                         onBackClick = { selectedProject = null },
                         onSaveProject = { savedProject ->
-                            // 빠른 반응성을 위해 로컬 상태를 우선 업데이트한 뒤 서버에 동기화 요청
                             val index = projectList.indexOfFirst { it.id == savedProject.id }
                             if (index != -1) {
                                 projectList[index] = savedProject
@@ -360,11 +357,9 @@ fun MainScreen() {
                             val refreshToken = SessionManager.getRefreshToken(context)
                             val provider = currentSession.provider
 
-                            // 1. 앱 세션 및 메모리 데이터 즉시 초기화
                             clearUserSessionData()
                             navController.navigate(BottomNavItem.Home.route)
 
-                            // 2. 소셜 SDK 로컬 세션 캐시 초기화 (다음 로그인 시 계정 선택 가능)
                             if (provider == "kakao") {
                                 UserApiClient.instance.logout { error ->
                                     if (error != null) {
@@ -382,7 +377,6 @@ fun MainScreen() {
                                 }
                             }
 
-                            // 3. 백엔드 서버 로그아웃 요청
                             if (!refreshToken.isNullOrEmpty()) {
                                 coroutineScope.launch {
                                     try {
