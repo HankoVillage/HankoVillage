@@ -262,13 +262,11 @@ private fun handleKakaoLogin(
                                 onFailure("가입 토큰을 받지 못했습니다.")
                             }
                         } else {
-                            // 기존 회원은 보안 인증 토큰을 앱 로컬 스토리지에 저장 후 세션을 시작합니다.
-                            context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
-                                .edit()
-                                .putString("access_token", body.accessToken)
-                                .putString("refresh_token", body.refreshToken)
-                                .apply()
-
+                            SessionManager.saveTokens(
+                                context = context,
+                                accessToken = body.accessToken ?: "",
+                                refreshToken = body.refreshToken ?: ""
+                            )
                             onSuccess(
                                 body.user?.id?.toString() ?: "",
                                 body.user?.nickname ?: "뜨개이웃",
