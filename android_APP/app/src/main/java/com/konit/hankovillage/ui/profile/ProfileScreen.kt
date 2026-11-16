@@ -35,6 +35,9 @@ import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.kakao.sdk.auth.model.OAuthToken
+import com.kakao.sdk.common.model.ClientError
+import com.kakao.sdk.common.model.ClientErrorCause
 import com.kakao.sdk.user.UserApiClient
 import com.konit.hankovillage.R
 import com.konit.hankovillage.network.RetrofitInstance
@@ -79,7 +82,6 @@ fun ProfileScreen(
 
     var profile by remember(userProfile) { mutableStateOf(userProfile) }
 
-    // SnapshotStateList 내부 변경까지 즉시 반영되도록 derivedStateOf 사용
     val completedWorks by remember(patternList) {
         derivedStateOf {
             patternList.filter { it.status == PatternStatus.COMPLETED }
@@ -110,7 +112,6 @@ fun ProfileScreen(
     var showDeleteAccountDialog by remember { mutableStateOf(false) }
     var isWithdrawing by remember { mutableStateOf(false) }
 
-    // EDIT_PROFILE은 내부 BackHandler에서 임시 파일 정리 후 뒤로가기 처리
     if (currentSubScreen != ProfileSubScreen.NONE && currentSubScreen != ProfileSubScreen.EDIT_PROFILE) {
         BackHandler { currentSubScreen = ProfileSubScreen.NONE }
     }
@@ -447,32 +448,32 @@ private fun executeWithdrawal(
 ) {
     val apiService = RetrofitInstance.getApiService(context)
 
-    // 2단계: 새로 발급받은 ID 토큰으로 서버 탈퇴 요청 → 3단계: 204면 연결 끊기 → 4단계: 토큰 삭제(onSuccess)
     fun requestWithdrawToServer(idToken: String) {
         coroutineScope.launch {
             try {
                 val response = apiService.withdrawUser(SocialLoginRequest(token = idToken))
 
                 if (response.code() == 204) {
-                    if (provider == "kakao") {
-                        // 204 성공 후 카카오 연결 끊기(unlink) 실행 후 로컬 토큰 삭제(onSuccess)
-                        UserApiClient.instance.unlink { _ ->
+                    when (provider) {
+                        "kakao" -> {
+                            UserApiClient.instance.unlink { _ ->
+                                onSuccess()
+                            }
+                        }
+                        "google" -> {
+                            try {
+                                CredentialManager.create(context)
+                                    .clearCredentialState(ClearCredentialStateRequest())
+                            } catch (_: Exception) {
+                            }
                             onSuccess()
                         }
-                    } else if (provider == "google") {
-                        try {
-                            CredentialManager.create(context)
-                                .clearCredentialState(androidx.credentials.ClearCredentialStateRequest())
-                        } catch (_: Exception) {}
-                        onSuccess()
-                    } else {
-                        onSuccess()
+                        else -> onSuccess()
                     }
                 } else {
-                    // 204가 아니면 연결 끊기나 토큰 삭제를 하지 않고 오류 메시지 표시
                     val errorJson = response.errorBody()?.string()
                     val detailMessage = try {
-                        org.json.JSONObject(errorJson ?: "").optString("detail")
+                        JSONObject(errorJson ?: "").optString("detail")
                     } catch (_: Exception) {
                         ""
                     }
@@ -498,10 +499,9 @@ private fun executeWithdrawal(
         }
     }
 
-    // 1단계: 탈퇴 버튼 클릭 시점마다 소셜 재로그인으로 새 ID 토큰 발급
     when (provider) {
         "kakao" -> {
-            val callback: (com.kakao.sdk.auth.model.OAuthToken?, Throwable?) -> Unit = { token, error ->
+            val callback: (OAuthToken?, Throwable?) -> Unit = { token, error ->
                 if (error != null || token?.idToken == null) {
                     onFailure("카카오 재인증에 실패했습니다.")
                 } else {
@@ -512,10 +512,7 @@ private fun executeWithdrawal(
             if (UserApiClient.instance.isKakaoTalkLoginAvailable(context)) {
                 UserApiClient.instance.loginWithKakaoTalk(context) { token, error ->
                     if (error != null) {
-                        // 사용자가 직접 취소한 경우가 아니면 카카오계정 웹 로그인으로 폴백
-                        if (error is com.kakao.sdk.common.model.ClientError &&
-                            error.reason == com.kakao.sdk.common.model.ClientErrorCause.Cancelled
-                        ) {
+                        if (error is ClientError && error.reason == ClientErrorCause.Cancelled) {
                             onFailure("카카오 재인증이 취소되었습니다.")
                         } else {
                             UserApiClient.instance.loginWithKakaoAccount(context, callback = callback)
@@ -542,12 +539,10 @@ private fun executeWithdrawal(
 
             coroutineScope.launch {
                 try {
-                    // 캐시된 기존 로그인 ID 토큰을 비워서 새 ID 토큰이 발급되도록 강제
                     try {
-                        credentialManager.clearCredentialState(
-                            androidx.credentials.ClearCredentialStateRequest()
-                        )
-                    } catch (_: Exception) {}
+                        credentialManager.clearCredentialState(ClearCredentialStateRequest())
+                    } catch (_: Exception) {
+                    }
 
                     val result = credentialManager.getCredential(request = request, context = context)
                     val credential = result.credential
