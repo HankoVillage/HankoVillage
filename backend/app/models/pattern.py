@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, Text, func, text
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -29,10 +29,9 @@ class Pattern(Base):
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     title: Mapped[str] = mapped_column(String(50))
-    needle_info: Mapped[str | None] = mapped_column(String(50))
+    yarn_info: Mapped[str | None] = mapped_column(String(50))
     tag: Mapped[str] = mapped_column(String(10))
     status: Mapped[str] = mapped_column(String(15), server_default=text("'planned'"))
-    description: Mapped[str | None] = mapped_column(Text)
     link_url: Mapped[str | None] = mapped_column(String(2048))
     finished_photo_key: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(
