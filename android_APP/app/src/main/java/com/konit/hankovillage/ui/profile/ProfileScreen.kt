@@ -1,5 +1,6 @@
 package com.konit.hankovillage.ui.profile
 
+import android.content.Context
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -28,6 +29,19 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.credentials.ClearCredentialStateRequest
+import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.kakao.sdk.auth.model.OAuthToken
+import com.kakao.sdk.common.model.ClientError
+import com.kakao.sdk.common.model.ClientErrorCause
+import com.kakao.sdk.user.UserApiClient
+import com.konit.hankovillage.R
+import com.konit.hankovillage.network.RetrofitInstance
+import com.konit.hankovillage.network.SocialLoginRequest
 import com.konit.hankovillage.ui.community.PostData
 import com.konit.hankovillage.ui.pattern.PatternData
 import com.konit.hankovillage.ui.pattern.PatternStatus
@@ -38,6 +52,9 @@ import com.konit.hankovillage.ui.theme.PointOrange
 import com.konit.hankovillage.ui.theme.TextDark
 import com.konit.hankovillage.ui.util.ImageCropDialog
 import com.konit.hankovillage.ui.util.deleteCroppedImageFile
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import org.json.JSONObject
 
 /**
  * 마이페이지 내 세부 서브 화면 이동을 위한 내비게이션 상태 정의
@@ -53,16 +70,18 @@ enum class ProfileSubScreen {
 @Composable
 fun ProfileScreen(
     userProfile: UserProfileData = UserProfileData(),
+    provider: String = "",
     postList: List<PostData> = emptyList(),
     patternList: List<PatternData> = emptyList(),
     onUpdateProfile: (UserProfileData) -> Unit = {},
-    onLogout: () -> Unit = {}
+    onLogout: () -> Unit = {},
+    onWithdrawSuccess: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     var profile by remember(userProfile) { mutableStateOf(userProfile) }
 
-    // SnapshotStateList 내부 변경까지 즉시 반영되도록 derivedStateOf 사용
     val completedWorks by remember(patternList) {
         derivedStateOf {
             patternList.filter { it.status == PatternStatus.COMPLETED }
@@ -91,8 +110,8 @@ fun ProfileScreen(
 
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showDeleteAccountDialog by remember { mutableStateOf(false) }
+    var isWithdrawing by remember { mutableStateOf(false) }
 
-    // EDIT_PROFILE은 내부 BackHandler에서 임시 파일 정리 후 뒤로가기 처리
     if (currentSubScreen != ProfileSubScreen.NONE && currentSubScreen != ProfileSubScreen.EDIT_PROFILE) {
         BackHandler { currentSubScreen = ProfileSubScreen.NONE }
     }
@@ -387,14 +406,161 @@ fun ProfileScreen(
 
     if (showDeleteAccountDialog) {
         DeleteAccountDialog(
-            onDismiss = { showDeleteAccountDialog = false },
+            isWithdrawing = isWithdrawing,
+            onDismiss = { if (!isWithdrawing) showDeleteAccountDialog = false },
             onConfirmDelete = {
-                deleteCroppedImageFile(context, profile.profileImageUri)
-                showDeleteAccountDialog = false
-                Toast.makeText(context, "회원 탈퇴가 완료되었습니다.", Toast.LENGTH_SHORT).show()
-                onLogout()
+                isWithdrawing = true
+                executeWithdrawal(
+                    context = context,
+                    provider = provider,
+                    coroutineScope = coroutineScope,
+                    onSuccess = {
+                        deleteCroppedImageFile(context, profile.profileImageUri)
+                        isWithdrawing = false
+                        showDeleteAccountDialog = false
+                        Toast.makeText(context, "회원 탈퇴가 완료되었습니다.", Toast.LENGTH_SHORT).show()
+                        onWithdrawSuccess()
+                    },
+                    onReauthFailed = { detailMessage ->
+                        isWithdrawing = false
+                        Toast.makeText(context, detailMessage, Toast.LENGTH_LONG).show()
+                    },
+                    onFailure = { errorMessage ->
+                        isWithdrawing = false
+                        Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
+                    }
+                )
             }
         )
+    }
+}
+
+/**
+ * 소셜 재인증 후 서버 회원 탈퇴(POST /users/me/withdrawal)를 처리합니다.
+ */
+private fun executeWithdrawal(
+    context: Context,
+    provider: String,
+    coroutineScope: CoroutineScope,
+    onSuccess: () -> Unit,
+    onReauthFailed: (String) -> Unit,
+    onFailure: (String) -> Unit
+) {
+    val apiService = RetrofitInstance.getApiService(context)
+
+    fun requestWithdrawToServer(idToken: String) {
+        coroutineScope.launch {
+            try {
+                val response = apiService.withdrawUser(SocialLoginRequest(token = idToken))
+
+                if (response.code() == 204) {
+                    when (provider) {
+                        "kakao" -> {
+                            UserApiClient.instance.unlink { _ ->
+                                onSuccess()
+                            }
+                        }
+                        "google" -> {
+                            try {
+                                CredentialManager.create(context)
+                                    .clearCredentialState(ClearCredentialStateRequest())
+                            } catch (_: Exception) {
+                            }
+                            onSuccess()
+                        }
+                        else -> onSuccess()
+                    }
+                } else {
+                    val errorJson = response.errorBody()?.string()
+                    val detailMessage = try {
+                        JSONObject(errorJson ?: "").optString("detail")
+                    } catch (_: Exception) {
+                        ""
+                    }
+
+                    when (response.code()) {
+                        403 -> {
+                            val msg = detailMessage.ifEmpty { "다시 로그인해 주세요." }
+                            onReauthFailed(msg)
+                        }
+                        401 -> {
+                            val msg = detailMessage.ifEmpty { "인증이 만료되었습니다. 다시 시도해 주세요." }
+                            onFailure(msg)
+                        }
+                        else -> {
+                            val msg = detailMessage.ifEmpty { "탈퇴 처리에 실패했습니다. (${response.code()})" }
+                            onFailure(msg)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                onFailure("네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.")
+            }
+        }
+    }
+
+    when (provider) {
+        "kakao" -> {
+            val callback: (OAuthToken?, Throwable?) -> Unit = { token, error ->
+                if (error != null || token?.idToken == null) {
+                    onFailure("카카오 재인증에 실패했습니다.")
+                } else {
+                    requestWithdrawToServer(token.idToken!!)
+                }
+            }
+
+            if (UserApiClient.instance.isKakaoTalkLoginAvailable(context)) {
+                UserApiClient.instance.loginWithKakaoTalk(context) { token, error ->
+                    if (error != null) {
+                        if (error is ClientError && error.reason == ClientErrorCause.Cancelled) {
+                            onFailure("카카오 재인증이 취소되었습니다.")
+                        } else {
+                            UserApiClient.instance.loginWithKakaoAccount(context, callback = callback)
+                        }
+                    } else {
+                        callback(token, null)
+                    }
+                }
+            } else {
+                UserApiClient.instance.loginWithKakaoAccount(context, callback = callback)
+            }
+        }
+
+        "google" -> {
+            val credentialManager = CredentialManager.create(context)
+            val googleIdOption = GetGoogleIdOption.Builder()
+                .setFilterByAuthorizedAccounts(false)
+                .setServerClientId(context.getString(R.string.default_web_client_id))
+                .setAutoSelectEnabled(false)
+                .build()
+            val request = GetCredentialRequest.Builder()
+                .addCredentialOption(googleIdOption)
+                .build()
+
+            coroutineScope.launch {
+                try {
+                    try {
+                        credentialManager.clearCredentialState(ClearCredentialStateRequest())
+                    } catch (_: Exception) {
+                    }
+
+                    val result = credentialManager.getCredential(request = request, context = context)
+                    val credential = result.credential
+                    if (credential is CustomCredential &&
+                        credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+                    ) {
+                        val idToken = GoogleIdTokenCredential.createFrom(credential.data).idToken
+                        requestWithdrawToServer(idToken)
+                    } else {
+                        onFailure("구글 인증 정보를 가져오지 못했습니다.")
+                    }
+                } catch (e: Exception) {
+                    onFailure("구글 재인증이 취소되었거나 실패했습니다.")
+                }
+            }
+        }
+
+        else -> onFailure("지원하지 않는 로그인 방식입니다.")
     }
 }
 
@@ -743,6 +909,7 @@ fun NotificationSettingsContent(
  */
 @Composable
 fun DeleteAccountDialog(
+    isWithdrawing: Boolean = false,
     onDismiss: () -> Unit,
     onConfirmDelete: () -> Unit
 ) {
@@ -754,7 +921,7 @@ fun DeleteAccountDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    "정말로 탈퇴하시겠습니까?\n\n작성한 글·댓글은 '탈퇴한 사용자'로 남습니다.",
+                    "정말로 탈퇴하시겠습니까?\n\n작성한 글과 댓글은 삭제되지 않고 '탈퇴한 사용자'로 남습니다.\n탈퇴를 진행하려면 본인 확인을 위해 다시 로그인해야 합니다.",
                     fontSize = 13.sp,
                     color = TextDark,
                     lineHeight = 18.sp
@@ -762,11 +929,11 @@ fun DeleteAccountDialog(
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable { isAgreed = !isAgreed }
+                    modifier = Modifier.clickable(enabled = !isWithdrawing) { isAgreed = !isAgreed }
                 ) {
                     Checkbox(
                         checked = isAgreed,
-                        onCheckedChange = { isAgreed = it },
+                        onCheckedChange = { if (!isWithdrawing) isAgreed = it },
                         colors = CheckboxDefaults.colors(checkedColor = PointOrange)
                     )
                     Text("안내 사항을 확인하였으며 동의합니다.", fontSize = 12.sp, color = TextDark)
@@ -776,14 +943,17 @@ fun DeleteAccountDialog(
         confirmButton = {
             Button(
                 onClick = onConfirmDelete,
-                enabled = isAgreed,
+                enabled = isAgreed && !isWithdrawing,
                 colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
             ) {
-                Text("탈퇴 확정", color = Color.White)
+                Text(if (isWithdrawing) "처리 중..." else "탈퇴 확정", color = Color.White)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isWithdrawing
+            ) {
                 Text("취소", color = Color.Gray)
             }
         }
