@@ -98,6 +98,7 @@ fun MainScreen() {
     }
 
     LaunchedEffect(currentUserSession) {
+        if (currentUserSession == null) return@LaunchedEffect
         try {
             val response = apiService.getProjects()
             if (response.isSuccessful) {
