@@ -1,6 +1,5 @@
 package com.konit.hankovillage.ui.auth
 
-import android.content.Context
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -29,6 +28,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.konit.hankovillage.network.RetrofitInstance
+import com.konit.hankovillage.network.SessionManager
 import com.konit.hankovillage.network.SignupRequest
 import com.konit.hankovillage.ui.pattern.UriImage
 import com.konit.hankovillage.ui.profile.UserProfileData
@@ -41,9 +41,10 @@ import com.konit.hankovillage.ui.util.deleteCroppedImageFile
 import kotlinx.coroutines.launch
 
 /**
- * 카카오 인증 후 회원 프로필 설정 및 필수 약관 동의를 진행하는 회원가입 화면 컴포저블입니다.
+ * 소셜 인증 후 회원 프로필 설정 및 필수 약관 동의를 진행하는 회원가입 화면 컴포저블입니다.
  *
- * @param signupToken 카카오 인증 성공 후 전달받은 회원가입 임시 토큰
+ * @param signupToken 소셜 인증 성공 후 전달받은 회원가입 임시 토큰
+ * @param provider 소셜 로그인 제공자 ("kakao" 또는 "google")
  * @param onSignupSuccess 회원가입 완료 및 세션 생성 완료 시 호출되는 콜백
  * @param onCancelOrExpired 가입 취소 또는 토큰 만료 시 이전 로그인 화면으로 이동하는 콜백
  */
@@ -51,12 +52,16 @@ import kotlinx.coroutines.launch
 @Composable
 fun SignupScreen(
     signupToken: String,
+    provider: String = "kakao",
     onSignupSuccess: (UserSession) -> Unit,
     onCancelOrExpired: () -> Unit
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val apiService = remember { RetrofitInstance.getApiService(context) }
+
+    // 에러 안내 문구에 사용할 소셜 플랫폼 한글 라벨 (컴포저블 최상위 스코프에 선언)
+    val providerLabel = if (provider == "google") "구글" else "카카오"
 
     var nickname by remember { mutableStateOf("") }
     var nicknameError by remember { mutableStateOf<String?>(null) }
@@ -323,15 +328,15 @@ fun SignupScreen(
 
                             if (response.isSuccessful && response.body() != null) {
                                 val body = response.body()!!
-                                context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
-                                    .edit()
-                                    .putString("access_token", body.accessToken)
-                                    .putString("refresh_token", body.refreshToken)
-                                    .apply()
+                                SessionManager.saveTokens(
+                                    context = context,
+                                    accessToken = body.accessToken ?: "",
+                                    refreshToken = body.refreshToken ?: ""
+                                )
 
                                 val newSession = UserSession(
                                     userId = body.user?.id?.toString() ?: "",
-                                    provider = "kakao",
+                                    provider = provider,
                                     providerId = body.user?.id?.toString() ?: "",
                                     profile = UserProfileData(
                                         nickname = body.user?.nickname ?: nickname,
@@ -346,14 +351,22 @@ fun SignupScreen(
                                 // 토큰 만료(401) 또는 중복(409) 등 백엔드 응답 상태별로 재인증을 유도하거나 닉네임 에러 표시
                                 when (response.code()) {
                                     401 -> {
-                                        Toast.makeText(context, "가입 시간이 만료되었습니다. 카카오 로그인을 다시 시도해 주세요.", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(
+                                            context,
+                                            "가입 시간이 만료되었습니다. ${providerLabel} 로그인을 다시 시도해 주세요.",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
                                         onCancelOrExpired()
                                     }
                                     409 -> {
                                         if (errorBody.contains("NICKNAME_DUPLICATE")) {
                                             nicknameError = "이미 사용 중인 닉네임입니다."
                                         } else {
-                                            Toast.makeText(context, "이미 가입된 계정입니다. 카카오 로그인을 다시 시도해 주세요.", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(
+                                                context,
+                                                "이미 가입된 계정입니다. ${providerLabel} 로그인을 다시 시도해 주세요.",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
                                             onCancelOrExpired()
                                         }
                                     }

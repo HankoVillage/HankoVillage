@@ -51,7 +51,7 @@ import kotlinx.coroutines.launch
 fun LoginScreen(
     onLoginSuccess: (UserSession) -> Unit,
     onGuestMode: () -> Unit,
-    onSignupRequired: (signupToken: String) -> Unit = {}
+    onSignupRequired: (signupToken: String, provider: String) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -117,7 +117,7 @@ fun LoginScreen(
                         },
                         onNewUser = { signupToken ->
                             isLoading = false
-                            onSignupRequired(signupToken)
+                            onSignupRequired(signupToken, "kakao")
                         },
                         onFailure = { message ->
                             isLoading = false
@@ -172,7 +172,7 @@ fun LoginScreen(
                         },
                         onNewUser = { signupToken ->
                             isLoading = false
-                            onSignupRequired(signupToken)
+                            onSignupRequired(signupToken, "google")
                         },
                         onFailure = { message ->
                             isLoading = false

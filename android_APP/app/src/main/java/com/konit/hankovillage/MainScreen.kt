@@ -77,6 +77,7 @@ fun MainScreen() {
 
     var currentUserSession by remember { mutableStateOf<UserSession?>(null) }
     var pendingSignupToken by remember { mutableStateOf<String?>(null) }
+    var pendingSignupProvider by remember { mutableStateOf("kakao") }
     var showLoginAuthDialog by remember { mutableStateOf(false) }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -146,6 +147,7 @@ fun MainScreen() {
         SessionManager.clearTokens(context)
         currentUserSession = null
         pendingSignupToken = null
+        pendingSignupProvider = "kakao"
 
         projectList.clear()
         selectedProject = null
@@ -323,6 +325,7 @@ fun MainScreen() {
                     if (pendingSignupToken != null) {
                         SignupScreen(
                             signupToken = pendingSignupToken!!,
+                            provider = pendingSignupProvider,
                             onSignupSuccess = { session ->
                                 pendingSignupToken = null
                                 currentUserSession = session
@@ -339,8 +342,9 @@ fun MainScreen() {
                             onGuestMode = {
                                 navController.navigate(BottomNavItem.Home.route)
                             },
-                            onSignupRequired = { signupToken ->
+                            onSignupRequired = { signupToken, provider ->
                                 pendingSignupToken = signupToken
+                                pendingSignupProvider = provider
                             }
                         )
                     }
