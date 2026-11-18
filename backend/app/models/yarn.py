@@ -15,7 +15,7 @@ class Yarn(Base):
     )
     label_image_key: Mapped[str | None] = mapped_column(String(255))
     name: Mapped[str] = mapped_column(String(50))
-    color: Mapped[str] = mapped_column(String(30))
+    color: Mapped[str | None] = mapped_column(String(30))
     purchase_date: Mapped[date | None] = mapped_column(Date)
     purchase_site: Mapped[str | None] = mapped_column(String(100))
     memo: Mapped[str | None] = mapped_column(Text)
