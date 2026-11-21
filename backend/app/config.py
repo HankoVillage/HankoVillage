@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL
@@ -21,6 +23,12 @@ class Settings(BaseSettings):
 
     kakao_native_app_key: str
     google_web_client_id: str
+
+    # Photo storage: "local" keeps files in a folder (laptop), "oci" uses Object Storage (server).
+    storage_backend: Literal["local", "oci"] = "local"
+    local_storage_dir: str = "/app/storage"
+    oci_region: str = "ap-tokyo-1"
+    oci_private_bucket: str = "hanko-private"
 
     @property
     def database_url(self) -> URL:
