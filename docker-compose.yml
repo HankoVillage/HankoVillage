@@ -6,7 +6,7 @@ x-logging: &default-logging
 
 services:
   db:
-    image: postgres:16
+    image: postgres:16.16
     restart: unless-stopped
     logging: *default-logging
     environment:
