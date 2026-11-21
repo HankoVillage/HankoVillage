@@ -3,6 +3,8 @@ package com.konit.hankovillage
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -14,6 +16,7 @@ import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -44,6 +47,7 @@ import com.konit.hankovillage.ui.counter.ProjectListScreen
 import com.konit.hankovillage.ui.pattern.PatternData
 import com.konit.hankovillage.ui.pattern.PatternScreen
 import com.konit.hankovillage.ui.profile.ProfileScreen
+import com.konit.hankovillage.ui.profile.UserProfileData
 import com.konit.hankovillage.ui.yarn.YarnData
 import com.konit.hankovillage.ui.yarn.YarnScreen
 import kotlinx.coroutines.launch
@@ -77,6 +81,7 @@ fun MainScreen() {
     val apiService = remember { RetrofitInstance.getApiService(context) }
 
     var currentUserSession by remember { mutableStateOf<UserSession?>(null) }
+    var isCheckingAutoLogin by remember { mutableStateOf(true) }
     var pendingSignupToken by remember { mutableStateOf<String?>(null) }
     var pendingSignupProvider by remember { mutableStateOf("kakao") }
     var showLoginAuthDialog by remember { mutableStateOf(false) }
@@ -85,28 +90,6 @@ fun MainScreen() {
     val currentRoute = navBackStackEntry?.destination?.route ?: BottomNavItem.Home.route
 
     val projectList = remember { mutableStateListOf<ProjectData>() }
-
-    // 로그인 상태에 따라 서버 목록 조회 또는 비회원 로컬 저장소 복원
-    LaunchedEffect(currentUserSession) {
-        if (currentUserSession == null) {
-            val savedGuestProjects = GuestProjectStorage.loadProjects(context)
-            projectList.clear()
-            projectList.addAll(savedGuestProjects)
-            return@LaunchedEffect
-        }
-        try {
-            val response = apiService.getProjects()
-            if (response.isSuccessful) {
-                response.body()?.let { serverList ->
-                    projectList.clear()
-                    projectList.addAll(serverList)
-                }
-            }
-        } catch (e: Exception) {
-            Toast.makeText(context, "목록 불러오기 실패: ${e.message}", Toast.LENGTH_SHORT).show()
-        }
-    }
-
     val yarnList = remember { mutableStateListOf<YarnData>() }
     val patternList = remember { mutableStateListOf<PatternData>() }
 
@@ -164,11 +147,67 @@ fun MainScreen() {
     }
 
     LaunchedEffect(Unit) {
+        val savedRefresh = SessionManager.getRefreshToken(context)
+        val savedUserId = SessionManager.getUserId(context)
+        val savedNickname = SessionManager.getNickname(context)
+        val savedProvider = SessionManager.getProvider(context)
+
+        if (!savedRefresh.isNullOrEmpty() && !savedUserId.isNullOrEmpty()) {
+            currentUserSession = UserSession(
+                userId = savedUserId,
+                provider = savedProvider,
+                providerId = "",
+                profile = UserProfileData(
+                    nickname = savedNickname ?: "뜨개이웃"
+                )
+            )
+        }
+        isCheckingAutoLogin = false
+    }
+
+    LaunchedEffect(currentUserSession, isCheckingAutoLogin) {
+        if (isCheckingAutoLogin) return@LaunchedEffect
+
+        if (currentUserSession == null) {
+            val savedGuestProjects = GuestProjectStorage.loadProjects(context)
+            projectList.clear()
+            projectList.addAll(savedGuestProjects)
+            return@LaunchedEffect
+        }
+
+        try {
+            val response = apiService.getProjects()
+            if (response.isSuccessful) {
+                response.body()?.let { serverList ->
+                    projectList.clear()
+                    projectList.addAll(serverList)
+                }
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Toast.makeText(context, "목록 불러오기 실패: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    LaunchedEffect(Unit) {
         SessionManager.sessionExpiredEvent.collect {
             clearUserSessionData()
             Toast.makeText(context, "로그인이 만료되었습니다. 다시 로그인해 주세요.", Toast.LENGTH_SHORT).show()
             navigateToProfile()
         }
+    }
+
+    if (isCheckingAutoLogin) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = appBgColor
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = pointOrangeColor)
+            }
+        }
+        return
     }
 
     Scaffold(
@@ -341,6 +380,7 @@ fun MainScreen() {
                             provider = pendingSignupProvider,
                             onSignupSuccess = { session ->
                                 GuestProjectStorage.clearProjects(context)
+                                SessionManager.saveUserInfo(context, session.userId, session.profile.nickname, session.provider)
                                 pendingSignupToken = null
                                 currentUserSession = session
                             },
@@ -352,6 +392,7 @@ fun MainScreen() {
                         LoginScreen(
                             onLoginSuccess = { session ->
                                 GuestProjectStorage.clearProjects(context)
+                                SessionManager.saveUserInfo(context, session.userId, session.profile.nickname, session.provider)
                                 currentUserSession = session
                             },
                             onGuestMode = {
@@ -370,6 +411,9 @@ fun MainScreen() {
                         postList = postList,
                         patternList = patternList,
                         onUpdateProfile = { updatedProfile ->
+                            currentUserSession?.let { session ->
+                                SessionManager.saveUserInfo(context, session.userId, updatedProfile.nickname, session.provider)
+                            }
                             currentUserSession = currentUserSession?.copy(profile = updatedProfile)
                         },
                         onLogout = {
