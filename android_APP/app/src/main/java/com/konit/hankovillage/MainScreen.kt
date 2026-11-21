@@ -175,13 +175,17 @@ fun MainScreen() {
             return@LaunchedEffect
         }
 
+        // 서버 조회 실패 시 비회원 카운터가 계정 기록처럼 남지 않도록 먼저 비움
+        projectList.clear()
+
         try {
             val response = apiService.getProjects()
             if (response.isSuccessful) {
                 response.body()?.let { serverList ->
-                    projectList.clear()
                     projectList.addAll(serverList)
                 }
+            } else {
+                Toast.makeText(context, "목록 불러오기 실패 (${response.code()})", Toast.LENGTH_SHORT).show()
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
