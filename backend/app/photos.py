@@ -83,7 +83,8 @@ def thumb_key(key: str) -> str:
 def photo_urls(path: str, key: str | None) -> dict[str, str] | None:
     """URLs for an API response, or None when there is no photo.
 
-    v= changes with every upload, so the app's image cache never shows an old photo.
+    v= changes with every upload, so the app's in-memory image cache (which ignores
+    HTTP cache headers) never shows an old photo under the same URL.
     Use this from the yarn, pattern and profile responses as well.
     """
     if key is None:

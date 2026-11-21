@@ -36,8 +36,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Photos"])
 
 JPEG = "image/jpeg"
-# Photo URLs carry ?v=, so a URL always means the same bytes: the app may cache it for a long time.
-CACHE_CONTROL = "private, max-age=31536000, immutable"
+# no-cache: the app may keep a copy but must ask before every use (If-None-Match -> 304),
+# so a deleted or replaced photo is never shown from a stale copy (decision 11/22).
+# private: shared caches (proxies) must not store these owner-only photos.
+CACHE_CONTROL = "private, no-cache"
 
 
 def photo_invalid() -> ApiError:
