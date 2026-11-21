@@ -35,6 +35,9 @@ def _encode_jpeg(image: Image.Image, icc_profile: bytes | None) -> bytes:
     # No exif= argument, so nothing from the original EXIF block (GPS etc.) is written back.
     # The colour profile is kept so yarn colours look the same as in the original.
     options = {"icc_profile": icc_profile} if icc_profile else {}
+    # Pillow writes some metadata from image.info by itself (for example a JPEG comment,
+    # which can hold names or places). Clear it so only what is passed below is written.
+    image.info.clear()
     image.save(buffer, format="JPEG", quality=JPEG_QUALITY, optimize=True, **options)
     return buffer.getvalue()
 
