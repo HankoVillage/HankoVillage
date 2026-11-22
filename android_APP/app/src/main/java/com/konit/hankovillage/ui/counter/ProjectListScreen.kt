@@ -273,8 +273,8 @@ fun ProjectListScreen(
                                 ) {
                                     Column(modifier = Modifier.padding(12.dp)) {
                                         Text(yarn.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextDark)
-                                        if (yarn.color.isNotBlank()) {
-                                            Text(yarn.color, fontSize = 11.sp, color = Color.Gray)
+                                        if (!yarn.color.isNullOrBlank()) {
+                                            Text(yarn.color.orEmpty(), fontSize = 11.sp, color = Color.Gray)
                                         }
                                     }
                                 }
