@@ -355,7 +355,9 @@ fun ProfileScreen(
                         ProfileMenuItem(
                             icon = Icons.Default.Notifications,
                             title = "알림 설정",
-                            onClick = { currentSubScreen = ProfileSubScreen.NOTIFICATION_SETTINGS }
+                            enabled = false,
+                            badgeText = "다음 학기 제공 예정",
+                            onClick = { /* 비활성화 상태이므로 진입 차단 */ }
                         )
                         HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
 
@@ -574,22 +576,63 @@ fun ProfileMenuItem(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
     titleColor: Color = TextDark,
+    enabled: Boolean = true,
+    badgeText: String? = null,
     onClick: () -> Unit
 ) {
+    val contentColor = if (enabled) titleColor else Color.Gray.copy(alpha = 0.6f)
+    val iconTint = if (enabled) titleColor else Color.Gray.copy(alpha = 0.6f)
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .then(
+                if (enabled) Modifier.clickable { onClick() } else Modifier
+            )
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(imageVector = icon, contentDescription = null, tint = titleColor, modifier = Modifier.size(20.dp))
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(text = title, fontSize = 14.sp, color = titleColor, fontWeight = FontWeight.Medium)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconTint,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = title,
+                fontSize = 14.sp,
+                color = contentColor,
+                fontWeight = FontWeight.Medium
+            )
+            if (badgeText != null) {
+                Surface(
+                    color = Color.Gray.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(6.dp)
+                ) {
+                    Text(
+                        text = badgeText,
+                        fontSize = 11.sp,
+                        color = Color.Gray,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
         }
-        Icon(imageVector = Icons.Default.ChevronRight, contentDescription = null, tint = Color.Gray)
+
+        if (enabled) {
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = Color.Gray
+            )
+        }
     }
 }
 
