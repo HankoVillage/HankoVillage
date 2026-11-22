@@ -4,6 +4,10 @@ import com.google.gson.annotations.SerializedName
 import com.konit.hankovillage.ui.counter.ProjectCounterUpdateRequest
 import com.konit.hankovillage.ui.counter.ProjectData
 import retrofit2.Response
+import com.konit.hankovillage.ui.pattern.PatternCreateRequest
+import com.konit.hankovillage.ui.pattern.PatternData
+import com.konit.hankovillage.ui.pattern.PatternUpdateRequest
+import retrofit2.http.Query
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -77,6 +81,40 @@ interface HankoApiService {
 
     @GET("users/me")
     suspend fun getMyProfile(): Response<AuthUserResponse>
+
+    // ==========================================
+    // 도안 보관소 (Patterns) API
+    // ==========================================
+
+    // 1. 내 도안 목록 조회 · 검색 · 필터 · 정렬
+    @GET("patterns")
+    suspend fun getPatterns(
+        @Query("search") search: String? = null, // 2글자 이상일 때만 전달 (1글자 전송 시 422)
+        @Query("tag") tag: String? = null,       // clothing, scarf, hat, bag, doll, etc
+        @Query("status") status: String? = null, // planned, in_progress, done
+        @Query("sort") sort: String = "NEWEST",  // NEWEST, TITLE
+        @Query("limit") limit: Int = 20,
+        @Query("offset") offset: Int = 0
+    ): Response<List<PatternData>>
+
+    // 2. 새 도안 등록
+    @POST("patterns")
+    suspend fun createPattern(
+        @Body request: PatternCreateRequest
+    ): Response<PatternData>
+
+    // 3. 도안 정보 · 진행 상태 · 완성작 사진 키 수정
+    @PATCH("patterns/{pattern_id}")
+    suspend fun updatePattern(
+        @Path("pattern_id") patternId: Long,
+        @Body request: PatternUpdateRequest
+    ): Response<PatternData>
+
+    // 4. 도안 삭제
+    @DELETE("patterns/{pattern_id}")
+    suspend fun deletePattern(
+        @Path("pattern_id") patternId: Long
+    ): Response<Unit>
 }
 
 /**

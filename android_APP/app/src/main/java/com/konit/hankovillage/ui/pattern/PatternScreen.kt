@@ -101,20 +101,23 @@ fun PatternScreen(
 ) {
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedStatusFilter by rememberSaveable { mutableStateOf<PatternStatus?>(null) }
+    var selectedTagFilter by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedSortOrder by rememberSaveable { mutableStateOf(PatternSortOrder.NEWEST) }
 
     var selectedPattern by remember { mutableStateOf<PatternData?>(null) }
     var showUploadDialog by rememberSaveable { mutableStateOf(false) }
 
     val filteredPatterns = patternList.filter { pattern ->
-        val matchesQuery = if (searchQuery.trim().length >= 2) {
-            pattern.title.contains(searchQuery, ignoreCase = true) ||
-                    pattern.tag.contains(searchQuery, ignoreCase = true) ||
-                    (pattern.yarnInfo?.contains(searchQuery, ignoreCase = true) == true)
+        val trimmedQuery = searchQuery.trim()
+        val matchesQuery = if (trimmedQuery.length >= 2) {
+            pattern.title.contains(trimmedQuery, ignoreCase = true) ||
+                    pattern.tag.equals(trimmedQuery, ignoreCase = true) ||
+                    pattern.tagCode.equals(trimmedQuery, ignoreCase = true)
         } else true
 
         val matchesStatus = selectedStatusFilter?.let { pattern.status == it } ?: true
-        matchesQuery && matchesStatus
+        val matchesTag = selectedTagFilter?.let { pattern.tag == it } ?: true
+        matchesQuery && matchesStatus && matchesTag
     }.sortedWith { p1, p2 ->
         if (selectedSortOrder == PatternSortOrder.NEWEST) p2.id.compareTo(p1.id)
         else p1.title.compareTo(p2.title)
@@ -172,7 +175,7 @@ fun PatternScreen(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("제목, 태그, 실 정보 검색 (2글자 이상)", fontSize = 13.sp) },
+                placeholder = { Text("제목, 태그 검색 (2글자 이상)", fontSize = 13.sp) },
                 leadingIcon = {
                     Icon(
                         Icons.Default.Search,
@@ -190,6 +193,7 @@ fun PatternScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
+            // 1. 진행 상태 필터 + 정렬
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -227,8 +231,6 @@ fun PatternScreen(
                     )
                 }
             }
-
-            Spacer(modifier = Modifier.height(12.dp))
 
             if (filteredPatterns.isEmpty()) {
                 Box(

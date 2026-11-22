@@ -44,8 +44,10 @@ import com.konit.hankovillage.ui.counter.ProjectCounterUpdateRequest
 import com.konit.hankovillage.ui.counter.ProjectData
 import com.konit.hankovillage.ui.counter.ProjectDataSaver
 import com.konit.hankovillage.ui.counter.ProjectListScreen
+import com.konit.hankovillage.ui.pattern.PatternCreateRequest
 import com.konit.hankovillage.ui.pattern.PatternData
 import com.konit.hankovillage.ui.pattern.PatternScreen
+import com.konit.hankovillage.ui.pattern.PatternUpdateRequest
 import com.konit.hankovillage.ui.profile.ProfileScreen
 import com.konit.hankovillage.ui.profile.UserProfileData
 import com.konit.hankovillage.ui.yarn.YarnData
@@ -70,7 +72,7 @@ sealed class BottomNavItem(val title: String, val route: String) {
  * 앱의 메인 화면 컴포저블입니다.
  *
  * 하단 네비게이션 바 제어, 로그인 세션 상태 및 회원가입 흐름 관리,
- * 프로젝트 API 연동 및 비회원 로컬 저장소 동기화를 담당합니다.
+ * 프로젝트·도안 API 연동 및 비회원 로컬 저장소 동기화를 담당합니다.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -176,6 +178,7 @@ fun MainScreen() {
         }
 
         projectList.clear()
+        patternList.clear()
 
         try {
             val response = apiService.getProjects()
@@ -184,7 +187,16 @@ fun MainScreen() {
                     projectList.addAll(serverList)
                 }
             } else {
-                Toast.makeText(context, "목록 불러오기 실패 (${response.code()})", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "프로젝트 불러오기 실패 (${response.code()})", Toast.LENGTH_SHORT).show()
+            }
+
+            val patternResponse = apiService.getPatterns(limit = 100)
+            if (patternResponse.isSuccessful) {
+                patternResponse.body()?.let { serverPatterns ->
+                    patternList.addAll(serverPatterns)
+                }
+            } else {
+                Toast.makeText(context, "도안 불러오기 실패 (${patternResponse.code()})", Toast.LENGTH_SHORT).show()
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
@@ -276,7 +288,71 @@ fun MainScreen() {
             }
 
             composable(BottomNavItem.Pattern.route) {
-                PatternScreen(patternList = patternList)
+                PatternScreen(
+                    patternList = patternList,
+                    onAddPattern = { newPattern ->
+                        coroutineScope.launch {
+                            try {
+                                val request = PatternCreateRequest(
+                                    title = newPattern.title,
+                                    tag = newPattern.tagCode,
+                                    status = newPattern.statusCode,
+                                    linkUrl = newPattern.patternUrl?.ifBlank { null },
+                                    finishedPhotoKey = newPattern.imageUrl,
+                                    yarnInfo = newPattern.yarnInfo?.ifBlank { null }
+                                )
+                                val response = apiService.createPattern(request)
+                                if (response.isSuccessful && response.body() != null) {
+                                    patternList.add(0, response.body()!!)
+                                } else {
+                                    Toast.makeText(context, "도안 등록 실패 (${response.code()})", Toast.LENGTH_SHORT).show()
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "네트워크 오류: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    onUpdatePattern = { updatedPattern ->
+                        coroutineScope.launch {
+                            try {
+                                val request = PatternUpdateRequest(
+                                    title = updatedPattern.title,
+                                    tag = updatedPattern.tagCode,
+                                    status = updatedPattern.statusCode,
+                                    linkUrl = updatedPattern.patternUrl?.ifBlank { null },
+                                    finishedPhotoKey = updatedPattern.imageUrl,
+                                    yarnInfo = updatedPattern.yarnInfo?.ifBlank { null }
+                                )
+                                val response = apiService.updatePattern(updatedPattern.id, request)
+                                if (response.isSuccessful && response.body() != null) {
+                                    val serverPattern = response.body()!!
+                                    val index = patternList.indexOfFirst { it.id == serverPattern.id }
+                                    if (index != -1) {
+                                        patternList[index] = serverPattern
+                                    }
+                                } else {
+                                    Toast.makeText(context, "도안 수정 실패 (${response.code()})", Toast.LENGTH_SHORT).show()
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "네트워크 오류: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    onDeletePattern = { deletedId ->
+                        coroutineScope.launch {
+                            try {
+                                val response = apiService.deletePattern(deletedId)
+                                if (response.isSuccessful) {
+                                    patternList.removeIf { it.id == deletedId }
+                                } else {
+                                    Toast.makeText(context, "도안 삭제 실패 (${response.code()})", Toast.LENGTH_SHORT).show()
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "네트워크 오류: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                )
             }
 
             composable(BottomNavItem.Home.route) {
