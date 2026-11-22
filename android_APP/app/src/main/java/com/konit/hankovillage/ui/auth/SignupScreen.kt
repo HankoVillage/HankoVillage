@@ -279,7 +279,6 @@ fun SignupScreen(
                     )
                 }
 
-                // 약관 동의 영역
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
