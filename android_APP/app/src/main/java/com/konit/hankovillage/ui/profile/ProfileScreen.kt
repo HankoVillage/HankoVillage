@@ -1057,7 +1057,11 @@ fun DeleteAccountDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    "정말로 탈퇴하시겠습니까?\n\n작성한 글과 댓글은 삭제되지 않고 '탈퇴한 사용자'로 남습니다.\n탈퇴를 진행하려면 본인 확인을 위해 다시 로그인해야 합니다.",
+                    "정말로 탈퇴하시겠습니까?\n" +
+                    "\n 작성한 글과 댓글은 삭제되지 않고 '탈퇴한 사용자'로 남습니다." +
+                    "\n 탈퇴를 진행하려면 본인 확인을 위해 다시 로그인해야 합니다."+
+                    "\n 탈퇴하면 작성자 확인이 어려워 글 삭제 요청이 제한될 수 있어요. " +
+                    "\n 지우고 싶은 글은 탈퇴 전에 삭제해 주세요." ,
                     fontSize = 13.sp,
                     color = TextDark,
                     lineHeight = 18.sp
