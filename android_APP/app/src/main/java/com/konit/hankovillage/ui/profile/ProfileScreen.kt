@@ -33,7 +33,6 @@ import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.kakao.sdk.auth.model.OAuthToken
 import com.kakao.sdk.common.model.ClientError
@@ -528,21 +527,24 @@ private fun executeWithdrawal(
 
         "google" -> {
             val credentialManager = CredentialManager.create(context)
-            val googleIdOption = GetGoogleIdOption.Builder()
-                .setFilterByAuthorizedAccounts(false)
-                .setServerClientId(context.getString(R.string.default_web_client_id))
-                .setAutoSelectEnabled(false)
+            val nonce = java.util.UUID.randomUUID().toString()
+            val signInWithGoogleOption = com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption.Builder(
+                serverClientId = context.getString(R.string.default_web_client_id)
+            )
+                .setNonce(nonce)
                 .build()
+
             val request = GetCredentialRequest.Builder()
-                .addCredentialOption(googleIdOption)
+                .addCredentialOption(signInWithGoogleOption)
                 .build()
 
             coroutineScope.launch {
                 try {
                     try {
-                        credentialManager.clearCredentialState(ClearCredentialStateRequest())
-                    } catch (_: Exception) {
-                    }
+                        credentialManager.clearCredentialState(
+                            androidx.credentials.ClearCredentialStateRequest()
+                        )
+                    } catch (_: Exception) {}
 
                     val result = credentialManager.getCredential(request = request, context = context)
                     val credential = result.credential

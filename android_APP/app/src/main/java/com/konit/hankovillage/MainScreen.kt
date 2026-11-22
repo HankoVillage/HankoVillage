@@ -3,6 +3,8 @@ package com.konit.hankovillage
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -14,6 +16,7 @@ import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -25,6 +28,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.kakao.sdk.user.UserApiClient
+import com.konit.hankovillage.data.local.GuestProjectStorage
 import com.konit.hankovillage.network.RefreshRequest
 import com.konit.hankovillage.network.RetrofitInstance
 import com.konit.hankovillage.network.SessionManager
@@ -43,6 +47,7 @@ import com.konit.hankovillage.ui.counter.ProjectListScreen
 import com.konit.hankovillage.ui.pattern.PatternData
 import com.konit.hankovillage.ui.pattern.PatternScreen
 import com.konit.hankovillage.ui.profile.ProfileScreen
+import com.konit.hankovillage.ui.profile.UserProfileData
 import com.konit.hankovillage.ui.yarn.YarnData
 import com.konit.hankovillage.ui.yarn.YarnScreen
 import kotlinx.coroutines.launch
@@ -65,7 +70,7 @@ sealed class BottomNavItem(val title: String, val route: String) {
  * 앱의 메인 화면 컴포저블입니다.
  *
  * 하단 네비게이션 바 제어, 로그인 세션 상태 및 회원가입 흐름 관리,
- * 프로젝트 API 연동 상태 동기화를 담당합니다.
+ * 프로젝트 API 연동 및 비회원 로컬 저장소 동기화를 담당합니다.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,6 +81,7 @@ fun MainScreen() {
     val apiService = remember { RetrofitInstance.getApiService(context) }
 
     var currentUserSession by remember { mutableStateOf<UserSession?>(null) }
+    var isCheckingAutoLogin by remember { mutableStateOf(true) }
     var pendingSignupToken by remember { mutableStateOf<String?>(null) }
     var pendingSignupProvider by remember { mutableStateOf("kakao") }
     var showLoginAuthDialog by remember { mutableStateOf(false) }
@@ -83,35 +89,7 @@ fun MainScreen() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: BottomNavItem.Home.route
 
-    val projectList = remember {
-        mutableStateListOf(
-            ProjectData(
-                id = 1L,
-                name = "가을 머플러",
-                needleType = "knitting",
-                needle = "메리노 울 · 4.0mm",
-                currentRows = 47,
-                targetRows = 120,
-                status = "in_progress"
-            )
-        )
-    }
-
-    LaunchedEffect(currentUserSession) {
-        if (currentUserSession == null) return@LaunchedEffect
-        try {
-            val response = apiService.getProjects()
-            if (response.isSuccessful) {
-                response.body()?.let { serverList ->
-                    projectList.clear()
-                    projectList.addAll(serverList)
-                }
-            }
-        } catch (e: Exception) {
-            Toast.makeText(context, "목록 불러오기 실패: ${e.message}", Toast.LENGTH_SHORT).show()
-        }
-    }
-
+    val projectList = remember { mutableStateListOf<ProjectData>() }
     val yarnList = remember { mutableStateListOf<YarnData>() }
     val patternList = remember { mutableStateListOf<PatternData>() }
 
@@ -169,11 +147,70 @@ fun MainScreen() {
     }
 
     LaunchedEffect(Unit) {
+        val savedRefresh = SessionManager.getRefreshToken(context)
+        val savedUserId = SessionManager.getUserId(context)
+        val savedNickname = SessionManager.getNickname(context)
+        val savedProvider = SessionManager.getProvider(context)
+
+        if (!savedRefresh.isNullOrEmpty() && !savedUserId.isNullOrEmpty()) {
+            currentUserSession = UserSession(
+                userId = savedUserId,
+                provider = savedProvider,
+                providerId = "",
+                profile = UserProfileData(
+                    nickname = savedNickname ?: "뜨개이웃"
+                )
+            )
+        }
+        isCheckingAutoLogin = false
+    }
+
+    LaunchedEffect(currentUserSession, isCheckingAutoLogin) {
+        if (isCheckingAutoLogin) return@LaunchedEffect
+
+        if (currentUserSession == null) {
+            val savedGuestProjects = GuestProjectStorage.loadProjects(context)
+            projectList.clear()
+            projectList.addAll(savedGuestProjects)
+            return@LaunchedEffect
+        }
+
+        projectList.clear()
+
+        try {
+            val response = apiService.getProjects()
+            if (response.isSuccessful) {
+                response.body()?.let { serverList ->
+                    projectList.addAll(serverList)
+                }
+            } else {
+                Toast.makeText(context, "목록 불러오기 실패 (${response.code()})", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Toast.makeText(context, "목록 불러오기 실패: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    LaunchedEffect(Unit) {
         SessionManager.sessionExpiredEvent.collect {
             clearUserSessionData()
             Toast.makeText(context, "로그인이 만료되었습니다. 다시 로그인해 주세요.", Toast.LENGTH_SHORT).show()
             navigateToProfile()
         }
+    }
+
+    if (isCheckingAutoLogin) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = appBgColor
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = pointOrangeColor)
+            }
+        }
+        return
     }
 
     Scaffold(
@@ -243,36 +280,49 @@ fun MainScreen() {
             }
 
             composable(BottomNavItem.Home.route) {
+                val isLoggedIn = currentUserSession != null
+
                 if (selectedProject == null) {
                     ProjectListScreen(
                         projectList = projectList,
                         yarnList = yarnList,
                         onAddProject = { newProject ->
-                            coroutineScope.launch {
-                                try {
-                                    val response = apiService.createProject(newProject)
-                                    if (response.isSuccessful && response.body() != null) {
-                                        projectList.add(0, response.body()!!)
-                                    } else {
-                                        Toast.makeText(context, "생성 실패 (${response.code()})", Toast.LENGTH_SHORT).show()
+                            if (isLoggedIn) {
+                                coroutineScope.launch {
+                                    try {
+                                        val response = apiService.createProject(newProject)
+                                        if (response.isSuccessful && response.body() != null) {
+                                            projectList.add(0, response.body()!!)
+                                        } else {
+                                            Toast.makeText(context, "생성 실패 (${response.code()})", Toast.LENGTH_SHORT).show()
+                                        }
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "네트워크 오류: ${e.message}", Toast.LENGTH_SHORT).show()
                                     }
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "네트워크 오류: ${e.message}", Toast.LENGTH_SHORT).show()
                                 }
+                            } else {
+                                val guestProject = newProject.copy(id = System.currentTimeMillis())
+                                projectList.add(0, guestProject)
+                                GuestProjectStorage.saveProjects(context, projectList)
                             }
                         },
                         onDeleteProject = { projectToDelete ->
-                            coroutineScope.launch {
-                                try {
-                                    val response = apiService.deleteProject(projectToDelete.id)
-                                    if (response.isSuccessful) {
-                                        projectList.remove(projectToDelete)
-                                    } else {
-                                        Toast.makeText(context, "삭제 실패 (${response.code()})", Toast.LENGTH_SHORT).show()
+                            if (isLoggedIn) {
+                                coroutineScope.launch {
+                                    try {
+                                        val response = apiService.deleteProject(projectToDelete.id)
+                                        if (response.isSuccessful) {
+                                            projectList.remove(projectToDelete)
+                                        } else {
+                                            Toast.makeText(context, "삭제 실패 (${response.code()})", Toast.LENGTH_SHORT).show()
+                                        }
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "네트워크 오류: ${e.message}", Toast.LENGTH_SHORT).show()
                                     }
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "네트워크 오류: ${e.message}", Toast.LENGTH_SHORT).show()
                                 }
+                            } else {
+                                projectList.remove(projectToDelete)
+                                GuestProjectStorage.saveProjects(context, projectList)
                             }
                         },
                         onProjectSelect = { project -> selectedProject = project }
@@ -294,15 +344,19 @@ fun MainScreen() {
                             }
                             selectedProject = savedProject
 
-                            coroutineScope.launch {
-                                try {
-                                    apiService.updateProjectCounter(
-                                        projectId = savedProject.id,
-                                        request = ProjectCounterUpdateRequest(currentRow = savedProject.currentRows)
-                                    )
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "단수 저장 실패: ${e.message}", Toast.LENGTH_SHORT).show()
+                            if (isLoggedIn) {
+                                coroutineScope.launch {
+                                    try {
+                                        apiService.updateProjectCounter(
+                                            projectId = savedProject.id,
+                                            request = ProjectCounterUpdateRequest(currentRow = savedProject.currentRows)
+                                        )
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "단수 저장 실패: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    }
                                 }
+                            } else {
+                                GuestProjectStorage.saveProjects(context, projectList)
                             }
                         }
                     )
@@ -328,6 +382,8 @@ fun MainScreen() {
                             signupToken = pendingSignupToken!!,
                             provider = pendingSignupProvider,
                             onSignupSuccess = { session ->
+                                GuestProjectStorage.clearProjects(context)
+                                SessionManager.saveUserInfo(context, session.userId, session.profile.nickname, session.provider)
                                 pendingSignupToken = null
                                 currentUserSession = session
                             },
@@ -338,6 +394,8 @@ fun MainScreen() {
                     } else {
                         LoginScreen(
                             onLoginSuccess = { session ->
+                                GuestProjectStorage.clearProjects(context)
+                                SessionManager.saveUserInfo(context, session.userId, session.profile.nickname, session.provider)
                                 currentUserSession = session
                             },
                             onGuestMode = {
@@ -356,6 +414,9 @@ fun MainScreen() {
                         postList = postList,
                         patternList = patternList,
                         onUpdateProfile = { updatedProfile ->
+                            currentUserSession?.let { session ->
+                                SessionManager.saveUserInfo(context, session.userId, updatedProfile.nickname, session.provider)
+                            }
                             currentUserSession = currentUserSession?.copy(profile = updatedProfile)
                         },
                         onLogout = {

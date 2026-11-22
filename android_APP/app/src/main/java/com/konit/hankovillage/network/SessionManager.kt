@@ -8,8 +8,10 @@ object SessionManager {
     private const val PREF_NAME = "auth_prefs"
     private const val KEY_ACCESS = "access_token"
     private const val KEY_REFRESH = "refresh_token"
+    private const val KEY_USER_ID = "user_id"
+    private const val KEY_NICKNAME = "user_nickname"
+    private const val KEY_PROVIDER = "auth_provider"
 
-    // 401 INVALID_REFRESH_TOKEN 발생 시 UI에 로그아웃(로그인 화면 이동) 신호 전달
     private val _sessionExpiredEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val sessionExpiredEvent = _sessionExpiredEvent.asSharedFlow()
 
@@ -27,11 +29,32 @@ object SessionManager {
             .apply()
     }
 
+    fun saveUserInfo(context: Context, userId: String, nickname: String, provider: String) {
+        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_USER_ID, userId)
+            .putString(KEY_NICKNAME, nickname)
+            .putString(KEY_PROVIDER, provider)
+            .apply()
+    }
+
+    fun getUserId(context: Context): String? =
+        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).getString(KEY_USER_ID, null)
+
+    fun getNickname(context: Context): String? =
+        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).getString(KEY_NICKNAME, null)
+
+    fun getProvider(context: Context): String =
+        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).getString(KEY_PROVIDER, "") ?: ""
+
     fun clearTokens(context: Context) {
         context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
             .edit()
             .remove(KEY_ACCESS)
             .remove(KEY_REFRESH)
+            .remove(KEY_USER_ID)
+            .remove(KEY_NICKNAME)
+            .remove(KEY_PROVIDER)
             .apply()
     }
 

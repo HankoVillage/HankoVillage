@@ -74,6 +74,9 @@ interface HankoApiService {
     suspend fun deleteProject(
         @Path("id") projectId: Long
     ): Response<Unit>
+
+    @GET("users/me")
+    suspend fun getMyProfile(): Response<AuthUserResponse>
 }
 
 /**

@@ -16,11 +16,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kakao.sdk.auth.model.OAuthToken
-import com.kakao.sdk.user.UserApiClient
-import com.konit.hankovillage.network.RetrofitInstance
-import com.konit.hankovillage.network.SocialLoginRequest
-import com.konit.hankovillage.ui.profile.UserProfileData
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
@@ -28,8 +23,14 @@ import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.kakao.sdk.auth.model.OAuthToken
+import com.kakao.sdk.user.UserApiClient
 import com.konit.hankovillage.R
+import com.konit.hankovillage.data.local.GuestProjectStorage
+import com.konit.hankovillage.network.RetrofitInstance
 import com.konit.hankovillage.network.SessionManager
+import com.konit.hankovillage.network.SocialLoginRequest
+import com.konit.hankovillage.ui.profile.UserProfileData
 import com.konit.hankovillage.ui.theme.BgColor
 import com.konit.hankovillage.ui.theme.GoogleBg
 import com.konit.hankovillage.ui.theme.GoogleBorder
@@ -55,7 +56,70 @@ fun LoginScreen(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    var pendingLoginProvider by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
+
+    val startKakaoLogin = {
+        isLoading = true
+        handleKakaoLogin(
+            context = context,
+            coroutineScope = coroutineScope,
+            onSuccess = { userId, nickname, profileImage ->
+                isLoading = false
+                val session = UserSession(
+                    userId = userId,
+                    provider = "kakao",
+                    providerId = userId,
+                    profile = UserProfileData(
+                        nickname = nickname,
+                        bio = "카카오로 로그인한 뜨개이웃",
+                        profileImageUri = profileImage
+                    )
+                )
+                Toast.makeText(context, "${nickname}님 환영합니다!", Toast.LENGTH_SHORT).show()
+                onLoginSuccess(session)
+            },
+            onNewUser = { signupToken ->
+                isLoading = false
+                onSignupRequired(signupToken, "kakao")
+            },
+            onFailure = { message ->
+                isLoading = false
+                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    val startGoogleLogin = {
+        isLoading = true
+        handleGoogleLogin(
+            context = context,
+            coroutineScope = coroutineScope,
+            onSuccess = { userId, nickname, profileImage ->
+                isLoading = false
+                val session = UserSession(
+                    userId = userId,
+                    provider = "google",
+                    providerId = userId,
+                    profile = UserProfileData(
+                        nickname = nickname,
+                        bio = "구글 계정으로 시작한 뜨개이웃",
+                        profileImageUri = profileImage
+                    )
+                )
+                Toast.makeText(context, "${nickname}님 환영합니다!", Toast.LENGTH_SHORT).show()
+                onLoginSuccess(session)
+            },
+            onNewUser = { signupToken ->
+                isLoading = false
+                onSignupRequired(signupToken, "google")
+            },
+            onFailure = { message ->
+                isLoading = false
+                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -96,34 +160,11 @@ fun LoginScreen(
 
             Button(
                 onClick = {
-                    isLoading = true
-                    handleKakaoLogin(
-                        context = context,
-                        coroutineScope = coroutineScope,
-                        onSuccess = { userId, nickname, profileImage ->
-                            isLoading = false
-                            val session = UserSession(
-                                userId = userId,
-                                provider = "kakao",
-                                providerId = userId,
-                                profile = UserProfileData(
-                                    nickname = nickname,
-                                    bio = "카카오로 로그인한 뜨개이웃",
-                                    profileImageUri = profileImage
-                                )
-                            )
-                            Toast.makeText(context, "${nickname}님 환영합니다!", Toast.LENGTH_SHORT).show()
-                            onLoginSuccess(session)
-                        },
-                        onNewUser = { signupToken ->
-                            isLoading = false
-                            onSignupRequired(signupToken, "kakao")
-                        },
-                        onFailure = { message ->
-                            isLoading = false
-                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                        }
-                    )
+                    if (GuestProjectStorage.hasGuestProjects(context)) {
+                        pendingLoginProvider = "kakao"
+                    } else {
+                        startKakaoLogin()
+                    }
                 },
                 enabled = !isLoading,
                 modifier = Modifier
@@ -151,34 +192,11 @@ fun LoginScreen(
 
             OutlinedButton(
                 onClick = {
-                    isLoading = true
-                    handleGoogleLogin(
-                        context = context,
-                        coroutineScope = coroutineScope,
-                        onSuccess = { userId, nickname, profileImage ->
-                            isLoading = false
-                            val session = UserSession(
-                                userId = userId,
-                                provider = "google",
-                                providerId = userId,
-                                profile = UserProfileData(
-                                    nickname = nickname,
-                                    bio = "구글 계정으로 시작한 뜨개이웃",
-                                    profileImageUri = profileImage
-                                )
-                            )
-                            Toast.makeText(context, "${nickname}님 환영합니다!", Toast.LENGTH_SHORT).show()
-                            onLoginSuccess(session)
-                        },
-                        onNewUser = { signupToken ->
-                            isLoading = false
-                            onSignupRequired(signupToken, "google")
-                        },
-                        onFailure = { message ->
-                            isLoading = false
-                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                        }
-                    )
+                    if (GuestProjectStorage.hasGuestProjects(context)) {
+                        pendingLoginProvider = "google"
+                    } else {
+                        startGoogleLogin()
+                    }
                 },
                 enabled = !isLoading,
                 modifier = Modifier
@@ -219,6 +237,37 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
     }
+
+    if (pendingLoginProvider != null) {
+        AlertDialog(
+            onDismissRequest = { pendingLoginProvider = null },
+            title = { Text("비회원 기록 삭제 안내", fontWeight = FontWeight.Bold) },
+            text = {
+                Text("로그인하면 이 기기에 저장된 비회원 카운터 기록은 모두 삭제돼요. 계속할까요?")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val targetProvider = pendingLoginProvider
+                        pendingLoginProvider = null
+                        if (targetProvider == "kakao") {
+                            startKakaoLogin()
+                        } else if (targetProvider == "google") {
+                            startGoogleLogin()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PointOrange)
+                ) {
+                    Text("확인하고 로그인", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingLoginProvider = null }) {
+                    Text("취소", color = Color.Gray)
+                }
+            }
+        )
+    }
 }
 
 /**
@@ -240,7 +289,6 @@ private fun handleKakaoLogin(
         } else if (token != null) {
             val idToken = token.idToken
 
-            // 백엔드의 OIDC ID Token 검증을 위해 idToken이 필수이므로 유효성을 우선 확인합니다.
             if (idToken == null) {
                 Log.e("KakaoAuth", "idToken이 null입니다. 카카오 콘솔 OIDC 설정을 확인하세요.")
                 onFailure("카카오 인증 설정을 확인해 주세요.")
@@ -253,7 +301,6 @@ private fun handleKakaoLogin(
                     if (response.isSuccessful && response.body() != null) {
                         val body = response.body()!!
 
-                        // 백엔드 판별 결과 신규 회원일 경우 약관 동의 및 프로필 설정을 위해 가입 화면으로 전환합니다.
                         if (body.isNewUser) {
                             val signupToken = body.signupToken
                             if (signupToken != null) {
