@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
-from typing import List, Optional, Literal
-from fastapi import APIRouter, Depends, Query, UploadFile, File, Request, Response
-from sqlalchemy import or_, func, case, literal
+from typing import List, Optional
+from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile
+from sqlalchemy import case, func, literal, or_
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -11,33 +11,55 @@ from app.models.pattern import Pattern
 from app.models.user import User
 from app.schemas.pattern import (
     PatternCreate,
-    PatternUpdate,
     PatternResponse,
-    PatternTag,
     PatternStatus,
+    PatternTag,
+    PatternUpdate,
 )
 from app.utils.storage import (
+    delete_private_image,
+    get_private_image_bytes,
     process_square_jpeg,
     upload_private_image,
-    get_private_image_bytes,
-    delete_private_image,
 )
 
 router = APIRouter(prefix="/patterns", tags=["Patterns"])
 
+TAG_KO_TO_EN = {
+    "의류": "clothing",
+    "목도리": "scarf",
+    "모자": "hat",
+    "가방": "bag",
+    "인형": "doll",
+    "기타": "etc",
+}
+
+
+def validate_link_url(url: Optional[str]) -> Optional[str]:
+    if url is None or url.strip() == "":
+        return None
+    cleaned = url.strip()
+    if not (cleaned.startswith("http://") or cleaned.startswith("https://")):
+        raise ApiError(422, "INVALID_URL", "도안 링크는 http:// 또는 https://로 시작해야 해요")
+    return cleaned
+
 
 @router.get("", response_model=List[PatternResponse])
 def list_patterns(
-    search: Optional[str] = Query(None, min_length=2, description="제목/태그 검색어 (2글자 이상)"),
+    search: Optional[str] = Query(None, min_length=2, max_length=50, description="검색어 (2글자 이상)"),
     tag: Optional[PatternTag] = Query(None, description="태그 필터"),
     status: Optional[PatternStatus] = Query(None, description="진행 상태 필터"),
-    sort: Literal["NEWEST", "TITLE"] = Query("NEWEST", description="검색어 없을 때 기본 정렬"),
+    sort: str = Query("NEWEST", description="정렬 기준 (NEWEST / TITLE)"),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """내 도안 목록 조회 및 검색 (pg_trgm + 관련도 순 정렬)"""
+    sort_upper = sort.upper()
+    if sort_upper not in ("NEWEST", "LATEST", "TITLE"):
+        raise ApiError(422, "VALIDATION_ERROR", "sort 값은 NEWEST 또는 TITLE이어야 해요")
+
     query = db.query(Pattern).filter(Pattern.user_id == current_user.id)
 
     if tag is not None:
@@ -56,26 +78,36 @@ def list_patterns(
         else:
             title_cond = literal(kw).op("<%")(Pattern.title)
 
+        mapped_tag = TAG_KO_TO_EN.get(kw, kw.lower())
+
         query = query.filter(
             or_(
                 title_cond,
-                Pattern.tag == kw.lower(),
+                Pattern.tag == mapped_tag,
             )
         )
 
         relevance_rank = case(
             (func.lower(Pattern.title) == kw.lower(), 1),
             (Pattern.title.ilike(f"{kw}%"), 2),
-            (Pattern.tag == kw.lower(), 3),
+            (Pattern.tag == mapped_tag, 3),
             else_=4,
         )
-        query = query.order_by(
-            relevance_rank.asc(),
-            Pattern.created_at.desc(),
-            Pattern.id.desc(),
-        )
+        if sort_upper == "TITLE":
+            query = query.order_by(
+                relevance_rank.asc(),
+                Pattern.title.asc(),
+                Pattern.created_at.desc(),
+                Pattern.id.desc(),
+            )
+        else:
+            query = query.order_by(
+                relevance_rank.asc(),
+                Pattern.created_at.desc(),
+                Pattern.id.desc(),
+            )
     else:
-        if sort == "TITLE":
+        if sort_upper == "TITLE":
             query = query.order_by(Pattern.title.asc(), Pattern.id.desc())
         else:
             query = query.order_by(Pattern.created_at.desc(), Pattern.id.desc())
@@ -89,18 +121,17 @@ def create_pattern(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """새 도안 등록 (링크 저장, 완성작 사진은 PUT /patterns/{id}/image로 업로드)"""
-    now = datetime.now(timezone.utc)
+    """새 도안 등록"""
+    validated_url = validate_link_url(req.link_url)
+
     new_pattern = Pattern(
         user_id=current_user.id,
         title=req.title,
+        yarn_info=req.yarn_info,
         tag=req.tag,
         status=req.status,
-        link_url=req.link_url,
+        link_url=validated_url,
         finished_photo_key=req.finished_photo_key,
-        yarn_info=req.yarn_info,
-        created_at=now,
-        updated_at=now,
     )
     db.add(new_pattern)
     db.commit()
@@ -147,6 +178,9 @@ def update_pattern(
         if non_nullable in update_data and update_data[non_nullable] is None:
             raise ApiError(422, "VALIDATION_ERROR", f"{non_nullable} 값은 비워둘 수 없어요")
 
+    if "link_url" in update_data:
+        update_data["link_url"] = validate_link_url(update_data["link_url"])
+
     for field, value in update_data.items():
         setattr(pattern, field, value)
 
@@ -162,7 +196,7 @@ def delete_pattern(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """도안 삭제 (첨부된 완성작 사진도 OCI에서 함께 정리)"""
+    """도안 삭제 (첨부된 완성작 사진도 함께 정리)"""
     pattern = (
         db.query(Pattern)
         .filter(Pattern.id == pattern_id, Pattern.user_id == current_user.id)
@@ -174,7 +208,8 @@ def delete_pattern(
     old_key = pattern.finished_photo_key
     db.delete(pattern)
     db.commit()
-    delete_private_image(old_key)
+    if old_key:
+        delete_private_image(old_key)
 
 
 @router.put("/{pattern_id}/image", response_model=PatternResponse)
@@ -256,4 +291,5 @@ def remove_pattern_image(
     pattern.updated_at = datetime.now(timezone.utc)
     db.commit()
 
-    delete_private_image(old_key)
+    if old_key:
+        delete_private_image(old_key)
