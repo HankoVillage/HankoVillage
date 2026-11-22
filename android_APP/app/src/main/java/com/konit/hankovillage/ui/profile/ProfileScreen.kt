@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.credentials.ClearCredentialStateRequest
@@ -340,14 +341,14 @@ fun ProfileScreen(
                     Column {
                         ProfileMenuItem(
                             icon = Icons.Default.Edit,
-                            title = "작성한 글 (${myPosts.size})",
+                            title = "작성한 글",
                             onClick = { currentSubScreen = ProfileSubScreen.MY_POSTS }
                         )
                         HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
 
                         ProfileMenuItem(
                             icon = Icons.Default.Favorite,
-                            title = "좋아요한 글 (${likedPosts.size})",
+                            title = "좋아요한 글",
                             onClick = { currentSubScreen = ProfileSubScreen.LIKED_POSTS }
                         )
                         HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
@@ -355,9 +356,7 @@ fun ProfileScreen(
                         ProfileMenuItem(
                             icon = Icons.Default.Notifications,
                             title = "알림 설정",
-                            enabled = false,
-                            badgeText = "다음 학기 제공 예정",
-                            onClick = { /* 비활성화 상태이므로 진입 차단 */ }
+                            onClick = { currentSubScreen = ProfileSubScreen.NOTIFICATION_SETTINGS }
                         )
                         HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
 
@@ -576,63 +575,36 @@ fun ProfileMenuItem(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
     titleColor: Color = TextDark,
-    enabled: Boolean = true,
-    badgeText: String? = null,
     onClick: () -> Unit
 ) {
-    val contentColor = if (enabled) titleColor else Color.Gray.copy(alpha = 0.6f)
-    val iconTint = if (enabled) titleColor else Color.Gray.copy(alpha = 0.6f)
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .then(
-                if (enabled) Modifier.clickable { onClick() } else Modifier
-            )
+            .clickable { onClick() }
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = iconTint,
+                tint = titleColor,
                 modifier = Modifier.size(20.dp)
             )
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = title,
                 fontSize = 14.sp,
-                color = contentColor,
+                color = titleColor,
                 fontWeight = FontWeight.Medium
             )
-            if (badgeText != null) {
-                Surface(
-                    color = Color.Gray.copy(alpha = 0.15f),
-                    shape = RoundedCornerShape(6.dp)
-                ) {
-                    Text(
-                        text = badgeText,
-                        fontSize = 11.sp,
-                        color = Color.Gray,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
-            }
         }
-
-        if (enabled) {
-            Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = Color.Gray
-            )
-        }
+        Icon(
+            imageVector = Icons.Default.ChevronRight,
+            contentDescription = null,
+            tint = Color.Gray
+        )
     }
 }
 
@@ -774,7 +746,7 @@ fun EditProfileContent(
                     Text(
                         text = "${nickname.length}/10자",
                         modifier = Modifier.fillMaxWidth(),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                        textAlign = TextAlign.End,
                         fontSize = 10.sp,
                         color = Color.Gray
                     )
@@ -809,7 +781,7 @@ fun EditProfileContent(
                 Text(
                     text = "${bio.length}/30자",
                     modifier = Modifier.fillMaxWidth(),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                    textAlign = TextAlign.End,
                     fontSize = 10.sp,
                     color = Color.Gray
                 )
@@ -828,7 +800,8 @@ fun EditProfileContent(
 fun SimplePostListContent(
     title: String,
     posts: List<PostData>,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    isComingSoon: Boolean = true
 ) {
     Column(
         modifier = Modifier
@@ -844,6 +817,21 @@ fun SimplePostListContent(
         }
 
         Spacer(modifier = Modifier.height(12.dp))
+
+        if (isComingSoon) {
+            val descriptionTitle = if (title.contains("좋아요")) {
+                "좋아요한 게시글 모아보기 기능을\n열심히 준비하고 있어요!"
+            } else {
+                "내가 작성한 게시글 모아보기 기능을\n열심히 준비하고 있어요!"
+            }
+
+            FeatureComingSoonCard(
+                icon = if (title.contains("좋아요")) Icons.Default.FavoriteBorder else Icons.Default.EditNote,
+                headline = descriptionTitle,
+                subText = "커뮤니티 오픈과 함께 다음 학기 업데이트에서\n활동 내역을 확인하실 수 있습니다."
+            )
+            return@Column
+        }
 
         if (posts.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -886,7 +874,8 @@ fun NotificationSettingsContent(
     profile: UserProfileData,
     onBack: () -> Unit,
     onToggleComment: (Boolean) -> Unit,
-    onToggleLike: (Boolean) -> Unit
+    onToggleLike: (Boolean) -> Unit,
+    isComingSoon: Boolean = true
 ) {
     Column(
         modifier = Modifier
@@ -902,6 +891,15 @@ fun NotificationSettingsContent(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+
+        if (isComingSoon) {
+            FeatureComingSoonCard(
+                icon = Icons.Default.NotificationsNone,
+                headline = "댓글·좋아요 푸시 알림 기능을\n열심히 준비하고 있어요!",
+                subText = "커뮤니티 오픈과 함께 다음 학기 업데이트에서\n알림 설정을 이용하실 수 있습니다."
+            )
+            return@Column
+        }
 
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -944,6 +942,82 @@ fun NotificationSettingsContent(
                         colors = SwitchDefaults.colors(checkedThumbColor = PointOrange)
                     )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * 다음 학기 제공 예정 기능 공통 안내 카드 컴포저블
+ */
+@Composable
+fun FeatureComingSoonCard(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    headline: String,
+    subText: String
+) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = CardBg)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 36.dp, horizontal = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Surface(
+                    modifier = Modifier.size(64.dp),
+                    shape = CircleShape,
+                    color = PointOrange.copy(alpha = 0.15f)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = PointOrange,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
+
+                Surface(
+                    color = PointOrange.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "다음 학기 제공 예정",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = PointOrange,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+
+                Text(
+                    text = headline,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextDark,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 22.sp
+                )
+
+                Text(
+                    text = subText,
+                    fontSize = 13.sp,
+                    color = Color.Gray,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 19.sp
+                )
             }
         }
     }
