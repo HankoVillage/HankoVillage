@@ -1,8 +1,7 @@
 package com.konit.hankovillage.ui.auth
 
 object LegalTexts {
-    const val TERMS_OF_SERVICE =
-"""
+    const val TERMS_OF_SERVICE = """
 [한코마을 서비스 이용약관]
 
 제1조 (목적)
@@ -24,8 +23,7 @@ object LegalTexts {
 3. 단, 커뮤니티의 맥락 유지를 위해 탈퇴 전 작성한 게시글과 댓글은 삭제되지 않고 작성자명이 '탈퇴한 사용자'로 익명 처리됩니다.
 """
 
-    const val PRIVACY_POLICY =
-"""
+    const val PRIVACY_POLICY = """
 [한코마을 개인정보 처리방침]
 
 한코마을은 「개인정보 보호법」에 따라 이용자의 개인정보를 보호하고 이와 관련한 고충을 신속하고 원활하게 처리할 수 있도록 다음과 같이 개인정보 처리방침을 수립·공개합니다.
@@ -37,7 +35,7 @@ object LegalTexts {
 2. 개인정보의 수집 및 이용 목적
 - 회원 식별 및 소셜 로그인 기반 서비스 제공
 - 단수 카운터, 도안·실 보관소 데이터 동기화
-- 커뮤니티 게시글·댓글 작성 및 알림 서비스 제공
+- 커뮤니티 게시글·댓글 작성 및 알림 서비스 제공(예정)
 
 3. 개인정보의 보유 및 이용 기간
 - 회원 탈퇴 시까지 보유하며, 탈퇴 요청 시 지체 없이 파기합니다.
