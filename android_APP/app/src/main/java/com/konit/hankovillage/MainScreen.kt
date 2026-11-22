@@ -174,6 +174,7 @@ fun MainScreen() {
             val savedGuestProjects = GuestProjectStorage.loadProjects(context)
             projectList.clear()
             projectList.addAll(savedGuestProjects)
+            patternList.clear()
             return@LaunchedEffect
         }
 
@@ -290,69 +291,53 @@ fun MainScreen() {
             composable(BottomNavItem.Pattern.route) {
                 PatternScreen(
                     patternList = patternList,
-                    onAddPattern = { newPattern ->
-                        coroutineScope.launch {
-                            try {
-                                val request = PatternCreateRequest(
-                                    title = newPattern.title,
-                                    tag = newPattern.tagCode,
-                                    status = newPattern.statusCode,
-                                    linkUrl = newPattern.patternUrl?.ifBlank { null },
-                                    finishedPhotoKey = newPattern.imageUrl,
-                                    yarnInfo = newPattern.yarnInfo?.ifBlank { null }
-                                )
-                                val response = apiService.createPattern(request)
-                                if (response.isSuccessful && response.body() != null) {
-                                    patternList.add(0, response.body()!!)
-                                } else {
-                                    Toast.makeText(context, "도안 등록 실패 (${response.code()})", Toast.LENGTH_SHORT).show()
-                                }
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "네트워크 오류: ${e.message}", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    },
-                    onUpdatePattern = { updatedPattern ->
-                        coroutineScope.launch {
-                            try {
-                                val request = PatternUpdateRequest(
-                                    title = updatedPattern.title,
-                                    tag = updatedPattern.tagCode,
-                                    status = updatedPattern.statusCode,
-                                    linkUrl = updatedPattern.patternUrl?.ifBlank { null },
-                                    finishedPhotoKey = updatedPattern.imageUrl,
-                                    yarnInfo = updatedPattern.yarnInfo?.ifBlank { null }
-                                )
-                                val response = apiService.updatePattern(updatedPattern.id, request)
-                                if (response.isSuccessful && response.body() != null) {
-                                    val serverPattern = response.body()!!
-                                    val index = patternList.indexOfFirst { it.id == serverPattern.id }
-                                    if (index != -1) {
-                                        patternList[index] = serverPattern
-                                    }
-                                } else {
-                                    Toast.makeText(context, "도안 수정 실패 (${response.code()})", Toast.LENGTH_SHORT).show()
-                                }
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "네트워크 오류: ${e.message}", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    },
-                    onDeletePattern = { deletedId ->
-                        coroutineScope.launch {
-                            try {
-                                val response = apiService.deletePattern(deletedId)
-                                if (response.isSuccessful) {
-                                    patternList.removeIf { it.id == deletedId }
-                                } else {
-                                    Toast.makeText(context, "도안 삭제 실패 (${response.code()})", Toast.LENGTH_SHORT).show()
-                                }
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "네트워크 오류: ${e.message}", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    }
+                    isLoggedIn = currentUserSession != null
                 )
+            }
+
+            composable(BottomNavItem.Profile.route) {
+                val currentSession = currentUserSession
+                if (currentSession == null) {
+                    if (pendingSignupToken != null) {
+                        SignupScreen(
+                            signupToken = pendingSignupToken!!,
+                            onSignupSuccess = { session ->
+                                pendingSignupToken = null
+                                currentUserSession = session
+                            },
+                            onCancelOrExpired = {
+                                pendingSignupToken = null
+                            }
+                        )
+                    } else {
+                        LoginScreen(
+                            onLoginSuccess = { session ->
+                                currentUserSession = session
+                            },
+                            onGuestMode = {
+                                navController.navigate(BottomNavItem.Home.route)
+                            },
+                            onSignupRequired = { signupToken, provider ->
+                                pendingSignupToken = signupToken
+                                pendingSignupProvider = provider
+                            }
+                        )
+                    }
+                } else {
+                    ProfileScreen(
+                        userProfile = currentSession.profile,
+                        postList = postList,
+                        patternList = patternList,
+                        onUpdateProfile = { updatedProfile ->
+                            currentUserSession = currentUserSession?.copy(profile = updatedProfile)
+                        },
+                        onLogout = {
+                            currentUserSession = null
+                            patternList.clear()
+                            navController.navigate(BottomNavItem.Home.route)
+                        }
+                    )
+                }
             }
 
             composable(BottomNavItem.Home.route) {

@@ -27,11 +27,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
-import com.konit.hankovillage.ui.pattern.UriImage
 import com.konit.hankovillage.ui.theme.BgColor
 import com.konit.hankovillage.ui.theme.CardBg
 import com.konit.hankovillage.ui.theme.PointOrange
 import com.konit.hankovillage.ui.theme.TextDark
+import com.konit.hankovillage.ui.util.UriImage
 
 /**
  * 커뮤니티 메인 화면 컴포저블

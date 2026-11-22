@@ -26,7 +26,7 @@ enum class PatternSortOrder(val label: String, val serverSort: String) {
 }
 
 /**
- * 서버 응답(GET / POST / PATCH /patterns) 및 앱 화면 공용 도안 데이터 모델
+ * 서버 응답(GET / POST / PATCH / PUT image) 및 앱 화면 공용 도안 데이터 모델
  */
 data class PatternData(
     @SerializedName("id")
@@ -36,19 +36,22 @@ data class PatternData(
     var title: String,
 
     @SerializedName("tag")
-    var tagCode: String = "etc", // 서버 저장용 영문 코드 ("clothing", "scarf", "hat", "bag", "doll", "etc")
+    var tagCode: String = "etc",
 
     @SerializedName("yarn_info")
-    var yarnInfo: String? = null, // 사용 실 정보 (최대 50자)
+    var yarnInfo: String? = null,
 
     @SerializedName("link_url")
-    var patternUrl: String? = null, // 도안 링크 URL (최대 2048자)
+    var patternUrl: String? = null,
 
-    @SerializedName("finished_photo_key")
-    var imageUrl: String? = null, // 완성작 사진 키/경로
+    @SerializedName("image_url")
+    var imageUrl: String? = null,
+
+    @SerializedName("thumbnail_url")
+    var thumbnailUrl: String? = null,
 
     @SerializedName("status")
-    var statusCode: String = "planned" // 서버 저장용 상태 코드 ("planned", "in_progress", "done")
+    var statusCode: String = "planned"
 ) {
     init {
         if (title.length > 50) {
@@ -59,13 +62,11 @@ data class PatternData(
         }
     }
 
-    // UI 표시용 한글 태그 반환
     val tag: String
-        get() = toKoreanTag(tagCode)
+        get() = toKoreanTag(tagCode ?: "etc")
 
-    // UI 표시용 Enum 상태 반환
     val status: PatternStatus
-        get() = PatternStatus.fromServerCode(statusCode)
+        get() = PatternStatus.fromServerCode(statusCode ?: "planned")
 
     companion object {
         fun toKoreanTag(code: String?): String = when (code) {
@@ -104,9 +105,6 @@ data class PatternCreateRequest(
     @SerializedName("link_url")
     val linkUrl: String? = null,
 
-    @SerializedName("finished_photo_key")
-    val finishedPhotoKey: String? = null,
-
     @SerializedName("yarn_info")
     val yarnInfo: String? = null
 )
@@ -126,9 +124,6 @@ data class PatternUpdateRequest(
 
     @SerializedName("link_url")
     val linkUrl: String? = null,
-
-    @SerializedName("finished_photo_key")
-    val finishedPhotoKey: String? = null,
 
     @SerializedName("yarn_info")
     val yarnInfo: String? = null
