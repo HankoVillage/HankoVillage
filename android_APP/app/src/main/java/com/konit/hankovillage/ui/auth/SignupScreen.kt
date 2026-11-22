@@ -1,6 +1,5 @@
 package com.konit.hankovillage.ui.auth
 
-import android.content.Context
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -25,10 +24,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.konit.hankovillage.network.RetrofitInstance
+import com.konit.hankovillage.network.SessionManager
 import com.konit.hankovillage.network.SignupRequest
 import com.konit.hankovillage.ui.pattern.UriImage
 import com.konit.hankovillage.ui.profile.UserProfileData
@@ -66,7 +65,7 @@ fun SignupScreen(
     var profileImageUri by remember { mutableStateOf<String?>(null) }
     var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
 
-    // 다음 학기 서버 업로드/프로필 API 연동 전까지 비활성화 유지
+    // 다음 주 프로필 수정 연동 전까지 가입 화면에서 숨김 처리
     val isProfileDetailEnabled = false
 
     var isTermsAgreed by remember { mutableStateOf(false) }
@@ -122,72 +121,51 @@ fun SignupScreen(
                     lineHeight = 30.sp
                 )
 
-                // 프로필 사진 영역 (다음 학기 제공 예정 - 비활성화)
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(90.dp)
-                            .clip(CircleShape)
-                            .background(CardBg.copy(alpha = if (isProfileDetailEnabled) 1f else 0.5f))
-                            .then(
-                                if (isProfileDetailEnabled) {
-                                    Modifier.clickable { galleryLauncher.launch("image/*") }
-                                } else {
-                                    Modifier
-                                }
-                            ),
-                        contentAlignment = Alignment.Center
+                // 프로필 사진 영역 (isProfileDetailEnabled가 false일 때는 숨김)
+                if (isProfileDetailEnabled) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        if (!profileImageUri.isNullOrEmpty()) {
-                            UriImage(
-                                uriString = profileImageUri!!,
-                                contentDescription = "프로필 사진",
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = "기본 프로필",
-                                tint = Color.Gray.copy(alpha = if (isProfileDetailEnabled) 1f else 0.45f),
-                                modifier = Modifier.size(46.dp)
-                            )
-                        }
                         Box(
                             modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .size(26.dp)
+                                .size(90.dp)
                                 .clip(CircleShape)
-                                .background(
-                                    if (isProfileDetailEnabled) PointOrange else Color.Gray.copy(alpha = 0.45f)
-                                ),
+                                .background(CardBg)
+                                .clickable { galleryLauncher.launch("image/*") },
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.CameraAlt,
-                                contentDescription = "사진 변경",
-                                tint = Color.White,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
-                    }
-
-                    if (!isProfileDetailEnabled) {
-                        Surface(
-                            color = Color.Gray.copy(alpha = 0.14f),
-                            shape = RoundedCornerShape(6.dp)
-                        ) {
-                            Text(
-                                text = "프로필 사진 · 다음 학기 제공 예정",
-                                fontSize = 11.sp,
-                                color = Color.Gray,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                            )
+                            if (!profileImageUri.isNullOrEmpty()) {
+                                UriImage(
+                                    uriString = profileImageUri!!,
+                                    contentDescription = "프로필 사진",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = "기본 프로필",
+                                    tint = Color.Gray,
+                                    modifier = Modifier.size(46.dp)
+                                )
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .size(26.dp)
+                                    .clip(CircleShape)
+                                    .background(PointOrange),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CameraAlt,
+                                    contentDescription = "사진 변경",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -222,61 +200,35 @@ fun SignupScreen(
                     }
                 }
 
-                // 자기소개 영역 (다음 학기 제공 예정 - 비활성화)
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
+                // 자기소개 영역 (isProfileDetailEnabled가 false일 때는 숨김)
+                if (isProfileDetailEnabled) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(
                             text = "자기소개",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (isProfileDetailEnabled) TextDark else Color.Gray
+                            color = TextDark
                         )
-                        if (!isProfileDetailEnabled) {
-                            Surface(
-                                color = Color.Gray.copy(alpha = 0.14f),
-                                shape = RoundedCornerShape(6.dp)
-                            ) {
-                                Text(
-                                    text = "다음 학기 제공 예정",
-                                    fontSize = 11.sp,
-                                    color = Color.Gray,
-                                    fontWeight = FontWeight.Medium,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-                    }
 
-                    OutlinedTextField(
-                        value = bio,
-                        onValueChange = { if (isProfileDetailEnabled && it.length <= 30) bio = it },
-                        enabled = isProfileDetailEnabled,
-                        readOnly = !isProfileDetailEnabled,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(92.dp),
-                        placeholder = {
-                            Text(
-                                text = if (isProfileDetailEnabled) {
-                                    "간단한 소개글을 적어주세요 (최대 30자)"
-                                } else {
-                                    "다음 학기 업데이트에서 작성할 수 있어요"
-                                },
-                                fontSize = 13.sp
+                        OutlinedTextField(
+                            value = bio,
+                            onValueChange = { if (it.length <= 30) bio = it },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(92.dp),
+                            placeholder = {
+                                Text(
+                                    text = "간단한 소개글을 적어주세요 (최대 30자)",
+                                    fontSize = 13.sp
+                                )
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = PointOrange,
+                                unfocusedBorderColor = Color.LightGray
                             )
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = PointOrange,
-                            unfocusedBorderColor = Color.LightGray,
-                            disabledBorderColor = Color.LightGray.copy(alpha = 0.5f),
-                            disabledContainerColor = CardBg.copy(alpha = 0.4f),
-                            disabledPlaceholderColor = Color.Gray.copy(alpha = 0.7f)
                         )
-                    )
+                    }
                 }
 
                 Column(
@@ -385,13 +337,11 @@ fun SignupScreen(
 
                             if (response.isSuccessful && response.body() != null) {
                                 val body = response.body()!!
-                                context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
-                                    .edit()
-                                    .putString("access_token", body.accessToken)
-                                    .putString("refresh_token", body.refreshToken)
-                                    .apply()
-
-                                val providerLabel = if (provider == "google") "구글" else "카카오"
+                                SessionManager.saveTokens(
+                                    context = context,
+                                    accessToken = body.accessToken.orEmpty(),
+                                    refreshToken = body.refreshToken.orEmpty()
+                                )
 
                                 val newSession = UserSession(
                                     userId = body.user?.id?.toString() ?: "",
