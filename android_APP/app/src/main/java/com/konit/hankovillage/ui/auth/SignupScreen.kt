@@ -1,5 +1,6 @@
 package com.konit.hankovillage.ui.auth
 
+import android.content.Context
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -28,7 +29,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.konit.hankovillage.network.RetrofitInstance
-import com.konit.hankovillage.network.SessionManager
 import com.konit.hankovillage.network.SignupRequest
 import com.konit.hankovillage.ui.pattern.UriImage
 import com.konit.hankovillage.ui.profile.UserProfileData
@@ -60,14 +60,14 @@ fun SignupScreen(
     val coroutineScope = rememberCoroutineScope()
     val apiService = remember { RetrofitInstance.getApiService(context) }
 
-    // 에러 안내 문구에 사용할 소셜 플랫폼 한글 라벨 (컴포저블 최상위 스코프에 선언)
-    val providerLabel = if (provider == "google") "구글" else "카카오"
-
     var nickname by remember { mutableStateOf("") }
     var nicknameError by remember { mutableStateOf<String?>(null) }
     var bio by remember { mutableStateOf("") }
     var profileImageUri by remember { mutableStateOf<String?>(null) }
     var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
+
+    // 다음 학기 서버 업로드/프로필 API 연동 전까지 비활성화 유지
+    val isProfileDetailEnabled = false
 
     var isTermsAgreed by remember { mutableStateOf(false) }
     var isPrivacyAgreed by remember { mutableStateOf(false) }
@@ -115,23 +115,31 @@ fun SignupScreen(
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
                 Text(
-                    text = "한코마을에서 사용할\n프로필을 설정해 주세요",
+                    text = "한코마을에서 사용할\n닉네임을 설정해 주세요",
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextDark,
                     lineHeight = 30.sp
                 )
 
-                Box(
+                // 프로필 사진 영역 (다음 학기 제공 예정 - 비활성화)
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Box(
                         modifier = Modifier
                             .size(90.dp)
                             .clip(CircleShape)
-                            .background(CardBg)
-                            .clickable { galleryLauncher.launch("image/*") },
+                            .background(CardBg.copy(alpha = if (isProfileDetailEnabled) 1f else 0.5f))
+                            .then(
+                                if (isProfileDetailEnabled) {
+                                    Modifier.clickable { galleryLauncher.launch("image/*") }
+                                } else {
+                                    Modifier
+                                }
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
                         if (!profileImageUri.isNullOrEmpty()) {
@@ -145,7 +153,7 @@ fun SignupScreen(
                             Icon(
                                 imageVector = Icons.Default.Person,
                                 contentDescription = "기본 프로필",
-                                tint = Color.Gray,
+                                tint = Color.Gray.copy(alpha = if (isProfileDetailEnabled) 1f else 0.45f),
                                 modifier = Modifier.size(46.dp)
                             )
                         }
@@ -154,7 +162,9 @@ fun SignupScreen(
                                 .align(Alignment.BottomEnd)
                                 .size(26.dp)
                                 .clip(CircleShape)
-                                .background(PointOrange),
+                                .background(
+                                    if (isProfileDetailEnabled) PointOrange else Color.Gray.copy(alpha = 0.45f)
+                                ),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
@@ -165,8 +175,24 @@ fun SignupScreen(
                             )
                         }
                     }
+
+                    if (!isProfileDetailEnabled) {
+                        Surface(
+                            color = Color.Gray.copy(alpha = 0.14f),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = "프로필 사진 · 다음 학기 제공 예정",
+                                fontSize = 11.sp,
+                                color = Color.Gray,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
                 }
 
+                // 닉네임 입력 (필수)
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("닉네임 *", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextDark)
                     OutlinedTextField(
@@ -196,32 +222,64 @@ fun SignupScreen(
                     }
                 }
 
+                // 자기소개 영역 (다음 학기 제공 예정 - 비활성화)
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("자기소개 (선택)", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextDark)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = "자기소개",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isProfileDetailEnabled) TextDark else Color.Gray
+                        )
+                        if (!isProfileDetailEnabled) {
+                            Surface(
+                                color = Color.Gray.copy(alpha = 0.14f),
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Text(
+                                    text = "다음 학기 제공 예정",
+                                    fontSize = 11.sp,
+                                    color = Color.Gray,
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+
                     OutlinedTextField(
                         value = bio,
-                        onValueChange = { if (it.length <= 30) bio = it },
+                        onValueChange = { if (isProfileDetailEnabled && it.length <= 30) bio = it },
+                        enabled = isProfileDetailEnabled,
+                        readOnly = !isProfileDetailEnabled,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(100.dp),
-                        placeholder = { Text("간단한 소개글을 적어주세요 (최대 30자)", fontSize = 14.sp) },
-                        supportingText = {
+                            .height(92.dp),
+                        placeholder = {
                             Text(
-                                text = "${bio.length}/30자",
-                                modifier = Modifier.fillMaxWidth(),
-                                textAlign = TextAlign.End,
-                                fontSize = 11.sp,
-                                color = Color.Gray
+                                text = if (isProfileDetailEnabled) {
+                                    "간단한 소개글을 적어주세요 (최대 30자)"
+                                } else {
+                                    "다음 학기 업데이트에서 작성할 수 있어요"
+                                },
+                                fontSize = 13.sp
                             )
                         },
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = PointOrange,
-                            unfocusedBorderColor = Color.LightGray
+                            unfocusedBorderColor = Color.LightGray,
+                            disabledBorderColor = Color.LightGray.copy(alpha = 0.5f),
+                            disabledContainerColor = CardBg.copy(alpha = 0.4f),
+                            disabledPlaceholderColor = Color.Gray.copy(alpha = 0.7f)
                         )
                     )
                 }
 
+                // 약관 동의 영역
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -328,11 +386,13 @@ fun SignupScreen(
 
                             if (response.isSuccessful && response.body() != null) {
                                 val body = response.body()!!
-                                SessionManager.saveTokens(
-                                    context = context,
-                                    accessToken = body.accessToken ?: "",
-                                    refreshToken = body.refreshToken ?: ""
-                                )
+                                context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+                                    .edit()
+                                    .putString("access_token", body.accessToken)
+                                    .putString("refresh_token", body.refreshToken)
+                                    .apply()
+
+                                val providerLabel = if (provider == "google") "구글" else "카카오"
 
                                 val newSession = UserSession(
                                     userId = body.user?.id?.toString() ?: "",
@@ -348,7 +408,7 @@ fun SignupScreen(
                                 onSignupSuccess(newSession)
                             } else {
                                 val errorBody = response.errorBody()?.string() ?: ""
-                                // 토큰 만료(401) 또는 중복(409) 등 백엔드 응답 상태별로 재인증을 유도하거나 닉네임 에러 표시
+                                val providerLabel = if (provider == "google") "구글" else "카카오"
                                 when (response.code()) {
                                     401 -> {
                                         Toast.makeText(
@@ -403,7 +463,6 @@ fun SignupScreen(
         ImageCropDialog(
             imageUri = pendingCropUri!!,
             onCropComplete = { croppedUri ->
-                // 기존 크롭된 임시 이미지가 있는 경우 불필요한 용량 차지 방지를 위해 삭제 후 교체
                 profileImageUri?.let { deleteCroppedImageFile(context, it) }
                 profileImageUri = croppedUri.toString()
                 pendingCropUri = null
