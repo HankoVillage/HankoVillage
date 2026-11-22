@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -24,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
@@ -42,8 +44,14 @@ fun CommunityScreen(
     postList: SnapshotStateList<PostData> = remember { mutableStateListOf() },
     isLoggedIn: Boolean = true,
     currentNickname: String = "김뜨개",
-    onRequireLogin: () -> Unit = {}
+    onRequireLogin: () -> Unit = {},
+    isComingSoon: Boolean = true
 ) {
+    if (isComingSoon) {
+        CommunityComingSoonContent()
+        return
+    }
+
     var selectedCategory by remember { mutableStateOf(CommunityCategory.ALL) }
     var searchQuery by remember { mutableStateOf("") }
 
@@ -830,4 +838,89 @@ fun ReportDialog(onDismiss: () -> Unit) {
             TextButton(onClick = onDismiss) { Text("취소", color = Color.Gray) }
         }
     )
+}
+/**
+ * 커뮤니티 다음 학기 제공 예정 안내 화면 컴포저블
+ */
+@Composable
+fun CommunityComingSoonContent() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(BgColor)
+            .padding(16.dp)
+    ) {
+        Text(
+            text = "커뮤니티",
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            color = TextDark
+        )
+
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = CardBg)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 36.dp, horizontal = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Surface(
+                        modifier = Modifier.size(64.dp),
+                        shape = CircleShape,
+                        color = PointOrange.copy(alpha = 0.15f)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Construction,
+                                contentDescription = null,
+                                tint = PointOrange,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                    }
+
+                    Surface(
+                        color = PointOrange.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = "다음 학기 제공 예정",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = PointOrange,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
+
+                    Text(
+                        text = "뜨개 이웃과 소통하는 커뮤니티를\n열심히 준비하고 있어요!",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextDark,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 22.sp
+                    )
+
+                    Text(
+                        text = "작품 자랑, 질문하기, 꿀팁 공유 기능은\n다음 학기 업데이트에서 만나보실 수 있습니다.",
+                        fontSize = 13.sp,
+                        color = Color.Gray,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 19.sp
+                    )
+                }
+            }
+        }
+    }
 }
