@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.db import get_db
 from app.errors import ApiError, register_error_handlers
-from app.routers import auth, memos, photos, projects
+from app.routers import auth, memos, photos, projects, patterns
 
 # Show INFO and above from our own code (for example the account deletion record).
 # Without this, Python drops everything below WARNING because no handler is set up.
@@ -38,3 +38,5 @@ def health(db: Session = Depends(get_db)):
     except Exception:
         raise ApiError(503, "DB_UNAVAILABLE", "잠시 후 다시 시도해 주세요")
     return {"status": "ok", "db": "ok"}
+
+app.include_router(patterns.router)
