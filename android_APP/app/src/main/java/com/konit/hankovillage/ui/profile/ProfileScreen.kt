@@ -245,14 +245,31 @@ fun ProfileScreen(
 
                         Spacer(modifier = Modifier.height(12.dp))
 
+                        val isEditProfileEnabled = false
+
                         OutlinedButton(
-                            onClick = { currentSubScreen = ProfileSubScreen.EDIT_PROFILE },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = PointOrange),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, PointOrange),
+                            onClick = {
+                                if (isEditProfileEnabled) {
+                                    currentSubScreen = ProfileSubScreen.EDIT_PROFILE
+                                }
+                            },
+                            enabled = isEditProfileEnabled,
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = PointOrange,
+                                disabledContentColor = Color.Gray
+                            ),
+                            border = androidx.compose.foundation.BorderStroke(
+                                width = 1.dp,
+                                color = if (isEditProfileEnabled) PointOrange else Color.Gray.copy(alpha = 0.45f)
+                            ),
                             shape = RoundedCornerShape(20.dp),
                             modifier = Modifier.height(36.dp)
                         ) {
-                            Text("프로필 수정", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                text = if (isEditProfileEnabled) "프로필 수정" else "프로필 수정 (준비 중)",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }
