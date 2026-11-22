@@ -89,23 +89,16 @@ fun UriImage(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PatternScreen(
-    patternList: SnapshotStateList<PatternData> = remember { mutableStateListOf() }
-) {
-    LaunchedEffect(Unit) {
-        if (patternList.isEmpty()) {
-            patternList.add(
-                PatternData(
-                    id = 1L,
-                    title = "가을 체크 머플러",
-                    tag = "목도리",
-                    yarnInfo = "메리노울 100g",
-                    patternUrl = "https://example.com/pattern/1",
-                    status = PatternStatus.IN_PROGRESS
-                )
-            )
-        }
+    patternList: SnapshotStateList<PatternData> = remember { mutableStateListOf() },
+    onAddPattern: (PatternData) -> Unit = { newPattern -> patternList.add(0, newPattern) },
+    onUpdatePattern: (PatternData) -> Unit = { updated ->
+        val index = patternList.indexOfFirst { it.id == updated.id }
+        if (index != -1) patternList[index] = updated
+    },
+    onDeletePattern: (Long) -> Unit = { deletedId ->
+        patternList.removeIf { it.id == deletedId }
     }
-
+) {
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedStatusFilter by rememberSaveable { mutableStateOf<PatternStatus?>(null) }
     var selectedSortOrder by rememberSaveable { mutableStateOf(PatternSortOrder.NEWEST) }
@@ -117,7 +110,7 @@ fun PatternScreen(
         val matchesQuery = if (searchQuery.trim().length >= 2) {
             pattern.title.contains(searchQuery, ignoreCase = true) ||
                     pattern.tag.contains(searchQuery, ignoreCase = true) ||
-                    pattern.yarnInfo.contains(searchQuery, ignoreCase = true)
+                    (pattern.yarnInfo?.contains(searchQuery, ignoreCase = true) == true)
         } else true
 
         val matchesStatus = selectedStatusFilter?.let { pattern.status == it } ?: true
@@ -136,12 +129,11 @@ fun PatternScreen(
             pattern = selectedPattern!!,
             onBackClick = { selectedPattern = null },
             onUpdate = { updated ->
-                val index = patternList.indexOfFirst { it.id == updated.id }
-                if (index != -1) patternList[index] = updated
+                onUpdatePattern(updated)
                 selectedPattern = updated
             },
             onDelete = { deletedId ->
-                patternList.removeIf { it.id == deletedId }
+                onDeletePattern(deletedId)
                 selectedPattern = null
             }
         )
@@ -158,7 +150,7 @@ fun PatternScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "도안 보관소 ",
+                    text = "도안 보관소",
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextDark
@@ -266,7 +258,7 @@ fun PatternScreen(
         PatternUploadDialog(
             onDismiss = { showUploadDialog = false },
             onConfirm = { newPattern ->
-                patternList.add(0, newPattern)
+                onAddPattern(newPattern)
                 showUploadDialog = false
             }
         )
@@ -343,7 +335,7 @@ fun PatternCardItem(
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            if (pattern.yarnInfo.isNotBlank()) {
+            if (!pattern.yarnInfo.isNullOrBlank()) {
                 Text(
                     text = "사용 실: ${pattern.yarnInfo}",
                     fontSize = 11.sp,
@@ -518,7 +510,7 @@ fun PatternDetailContent(
                 FilterChip(
                     selected = isSelected,
                     onClick = {
-                        onUpdate(pattern.copy(status = statusOption))
+                        onUpdate(pattern.copy(statusCode = statusOption.serverCode))
                     },
                     label = { Text(statusOption.label, fontSize = 12.sp) },
                     colors = FilterChipDefaults.filterChipColors(
@@ -542,7 +534,7 @@ fun PatternDetailContent(
             ) {
                 Text("사용 실: ", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextDark)
                 Text(
-                    if (pattern.yarnInfo.isNotBlank()) pattern.yarnInfo else "미입력",
+                    text = pattern.yarnInfo?.takeIf { it.isNotBlank() } ?: "미입력",
                     fontSize = 14.sp,
                     color = TextDark
                 )
@@ -551,11 +543,11 @@ fun PatternDetailContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        if (pattern.patternUrl.isNotBlank()) {
+        if (!pattern.patternUrl.isNullOrBlank()) {
             Button(
                 onClick = {
                     try {
-                        val rawUrl = pattern.patternUrl.trim()
+                        val rawUrl = pattern.patternUrl!!.trim()
                         val formattedUrl = if (!rawUrl.startsWith("http://") && !rawUrl.startsWith("https://")) {
                             "https://$rawUrl"
                         } else {
@@ -772,10 +764,10 @@ fun PatternUploadDialog(
 
                         onConfirm(
                             PatternData(
-                                title = title,
-                                tag = selectedTag,
-                                yarnInfo = yarnInfo,
-                                patternUrl = formattedLink,
+                                title = title.trim(),
+                                tagCode = PatternData.toServerTag(selectedTag),
+                                yarnInfo = yarnInfo.trim().ifBlank { null },
+                                patternUrl = formattedLink.ifBlank { null },
                                 imageUrl = imageUri
                             )
                         )
@@ -803,8 +795,8 @@ fun PatternEditDialog(
 ) {
     var title by remember { mutableStateOf(pattern.title) }
     var selectedTag by remember { mutableStateOf(pattern.tag) }
-    var yarnInfo by remember { mutableStateOf(pattern.yarnInfo) }
-    var patternUrl by remember { mutableStateOf(pattern.patternUrl) }
+    var yarnInfo by remember { mutableStateOf(pattern.yarnInfo ?: "") }
+    var patternUrl by remember { mutableStateOf(pattern.patternUrl ?: "") }
     var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
     val context = LocalContext.current
     val galleryLauncher = rememberLauncherForActivityResult(
@@ -945,10 +937,10 @@ fun PatternEditDialog(
 
                         onConfirm(
                             pattern.copy(
-                                title = title,
-                                tag = selectedTag,
-                                yarnInfo = yarnInfo,
-                                patternUrl = formattedLink,
+                                title = title.trim(),
+                                tagCode = PatternData.toServerTag(selectedTag),
+                                yarnInfo = yarnInfo.trim().ifBlank { null },
+                                patternUrl = formattedLink.ifBlank { null },
                                 imageUrl = imageUri
                             )
                         )
