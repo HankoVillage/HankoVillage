@@ -3,13 +3,21 @@ package com.konit.hankovillage.network
 import com.google.gson.annotations.SerializedName
 import com.konit.hankovillage.ui.counter.ProjectCounterUpdateRequest
 import com.konit.hankovillage.ui.counter.ProjectData
+import com.konit.hankovillage.ui.yarn.YarnCreateRequest
+import com.konit.hankovillage.ui.yarn.YarnData
+import com.konit.hankovillage.ui.yarn.YarnUpdateRequest
+import okhttp3.MultipartBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.Multipart
 import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.PUT
+import retrofit2.http.Part
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 /**
  * 한코마을 백엔드 RESTful API 통신 인터페이스입니다.
@@ -77,6 +85,45 @@ interface HankoApiService {
 
     @GET("users/me")
     suspend fun getMyProfile(): Response<AuthUserResponse>
+
+    // 1. 실 목록 조회 (최신순: NEWEST, 이름순: NAME)
+    @GET("yarns")
+    suspend fun getYarns(
+        @Query("sort") sort: String = "NEWEST",
+        @Query("limit") limit: Int = 20,
+        @Query("offset") offset: Int = 0
+    ): Response<List<YarnData>>
+
+    // 2. 새 실 등록 (텍스트 정보)
+    @POST("yarns")
+    suspend fun createYarn(@Body request: YarnCreateRequest): Response<YarnData>
+
+    // 3. 실 상세 조회
+    @GET("yarns/{id}")
+    suspend fun getYarnDetail(@Path("id") yarnId: Long): Response<YarnData>
+
+    // 4. 실 정보 수정
+    @PATCH("yarns/{id}")
+    suspend fun updateYarn(
+        @Path("id") yarnId: Long,
+        @Body request: YarnUpdateRequest
+    ): Response<YarnData>
+
+    // 5. 실 삭제
+    @DELETE("yarns/{id}")
+    suspend fun deleteYarn(@Path("id") yarnId: Long): Response<Unit>
+
+    // 6. 라벨 사진 업로드/교체 (800x800 JPEG Multipart)
+    @Multipart
+    @PUT("yarns/{id}/image")
+    suspend fun uploadYarnImage(
+        @Path("id") yarnId: Long,
+        @Part file: MultipartBody.Part
+    ): Response<YarnData>
+
+    // 7. 라벨 사진만 삭제
+    @DELETE("yarns/{id}/image")
+    suspend fun deleteYarnImage(@Path("id") yarnId: Long): Response<Unit>
 }
 
 /**
@@ -117,6 +164,7 @@ data class SocialLoginResponse(
     @SerializedName("signup_expires_in")
     val signupExpiresIn: Int? = null
 
+
 )
 
 /**
@@ -154,3 +202,4 @@ data class RefreshResponse(
     @SerializedName("token_type") val tokenType: String,
     @SerializedName("expires_in") val expiresIn: Int
 )
+
