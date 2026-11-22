@@ -149,19 +149,12 @@ async def upload_yarn_image(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """실 라벨 사진 업로드 및 썸네일 생성 (비공개 버킷)"""
     yarn = _get_user_yarn_or_404(yarn_id, current_user.id, db)
 
-    raw_bytes = await file.read()
-    main_jpeg, thumb_jpeg = process_square_jpeg(raw_bytes, file.content_type)
+    main_jpeg, thumb_jpeg = await process_square_jpeg(file)
+    new_key = upload_private_image(f"yarns/{yarn.id}", main_jpeg, thumb_jpeg)
 
     old_key = yarn.label_image_key
-    new_key = upload_private_image(
-        prefix=f"yarns/{current_user.id}",
-        main_bytes=main_jpeg,
-        thumb_bytes=thumb_jpeg,
-    )
-
     yarn.label_image_key = new_key
     db.commit()
     db.refresh(yarn)
@@ -181,7 +174,6 @@ def get_yarn_image(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """실 라벨 사진 비공개 조회 (ETag 캐시 지원)"""
     yarn = _get_user_yarn_or_404(yarn_id, current_user.id, db)
     if not yarn.label_image_key:
         raise ApiError(
@@ -190,36 +182,29 @@ def get_yarn_image(
             detail="등록된 라벨 사진이 없어요",
         )
 
-    image_bytes = get_private_image_bytes(yarn.label_image_key, thumb=thumb)
-    etag = f'"{hashlib.sha256(image_bytes).hexdigest()}"'
-
-    if request.headers.get("if-none-match") == etag:
+    image_bytes, etag = get_private_image_bytes(yarn.label_image_key, thumb=thumb)
+    if etag and request.headers.get("if-none-match") == etag:
         return Response(status_code=status.HTTP_304_NOT_MODIFIED)
 
-    return Response(
-        content=image_bytes,
-        media_type="image/jpeg",
-        headers={
-            "ETag": etag,
-            "Cache-Control": "private, max-age=3600",
-        },
-    )
+    headers = {"Cache-Control": "private, max-age=3600"}
+    if etag:
+        headers["ETag"] = etag
+
+    return Response(content=image_bytes, media_type="image/jpeg", headers=headers)
 
 
 # 8. 라벨 사진 삭제 (DELETE /yarns/{yarn_id}/image)
-@router.delete("/{yarn_id}/image", response_model=YarnResponse)
+@router.delete("/{yarn_id}/image", status_code=status.HTTP_204_NO_CONTENT)
 def delete_yarn_image(
     yarn_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """실 라벨 사진만 삭제"""
     yarn = _get_user_yarn_or_404(yarn_id, current_user.id, db)
 
-    if yarn.label_image_key:
-        delete_private_image(yarn.label_image_key)
-        yarn.label_image_key = None
-        db.commit()
-        db.refresh(yarn)
+    old_key = yarn.label_image_key
+    yarn.label_image_key = None
+    db.commit()
 
-    return yarn
+    delete_private_image(old_key)
+    return None
