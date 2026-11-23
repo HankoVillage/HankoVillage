@@ -3,14 +3,14 @@ package com.konit.hankovillage.network
 import com.google.gson.annotations.SerializedName
 import com.konit.hankovillage.ui.counter.ProjectCounterUpdateRequest
 import com.konit.hankovillage.ui.counter.ProjectData
-import com.konit.hankovillage.ui.yarn.YarnCreateRequest
-import com.konit.hankovillage.ui.yarn.YarnData
-import com.konit.hankovillage.ui.yarn.YarnUpdateRequest
-import okhttp3.MultipartBody
 import com.konit.hankovillage.ui.pattern.ImageUploadResponse
 import com.konit.hankovillage.ui.pattern.PatternCreateRequest
 import com.konit.hankovillage.ui.pattern.PatternData
 import com.konit.hankovillage.ui.pattern.PatternUpdateRequest
+import com.konit.hankovillage.ui.yarn.YarnCreateRequest
+import com.konit.hankovillage.ui.yarn.YarnData
+import com.konit.hankovillage.ui.yarn.YarnUpdateRequest
+import okhttp3.MultipartBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -146,7 +146,7 @@ interface HankoApiService {
     suspend fun uploadYarnImage(
         @Path("id") yarnId: Long,
         @Part file: MultipartBody.Part
-    ): Response<YarnData>
+    ): Response<ImageUploadResponse>
 
     // 7. 라벨 사진만 삭제
     @DELETE("yarns/{id}/image")
@@ -207,8 +207,6 @@ interface HankoApiService {
     suspend fun deletePatternImage(
         @Path("pattern_id") patternId: Long
     ): Response<Unit>
-
-
 }
 
 /**
@@ -248,8 +246,6 @@ data class SocialLoginResponse(
 
     @SerializedName("signup_expires_in")
     val signupExpiresIn: Int? = null
-
-
 )
 
 /**
@@ -301,4 +297,3 @@ data class RefreshResponse(
     @SerializedName("expires_in")
     val expiresIn: Int
 )
-

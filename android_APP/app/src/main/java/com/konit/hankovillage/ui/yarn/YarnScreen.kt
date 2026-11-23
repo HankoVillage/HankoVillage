@@ -1,10 +1,7 @@
 package com.konit.hankovillage.ui.yarn
 
 import android.content.Context
-import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Matrix
-import android.media.ExifInterface
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -44,16 +41,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.graphics.scale
 import com.konit.hankovillage.network.HankoApiService
 import com.konit.hankovillage.network.RetrofitInstance
 import com.konit.hankovillage.ui.counter.ProjectData
+import com.konit.hankovillage.ui.pattern.ImageUploadResponse
 import com.konit.hankovillage.ui.theme.BgColor
 import com.konit.hankovillage.ui.theme.CardBg
 import com.konit.hankovillage.ui.theme.PointOrange
 import com.konit.hankovillage.ui.theme.TextDark
 import com.konit.hankovillage.ui.util.ImageCropDialog
-import com.konit.hankovillage.ui.util.UriImage
 import com.konit.hankovillage.ui.util.deleteCroppedImageFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -62,7 +58,6 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import java.io.File
-import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Calendar
@@ -131,6 +126,8 @@ fun YarnScreen(
             try {
                 val response = resolvedApiService.deleteYarn(target.id)
                 if (response.isSuccessful || response.code() == 204) {
+                    deleteCroppedImageFile(context, target.imageUrl)
+                    deleteCroppedImageFile(context, target.thumbnailUrl)
                     yarnList.removeIf { it.id == target.id }
                     projectList?.indices?.forEach { idx ->
                         if (projectList[idx].yarnId == target.id) {
@@ -275,7 +272,7 @@ fun YarnScreen(
             titleText = "새 실 등록",
             confirmText = "등록하기",
             onDismiss = { showAddDialog = false },
-            onConfirm = { name, color, shop, purchaseDate, memo, localImageFile, _ ->
+            onConfirm = { name, color, shop, purchaseDate, memo, localImageUri, _ ->
                 coroutineScope.launch {
                     try {
                         val createReq = YarnCreateRequest(
@@ -287,6 +284,7 @@ fun YarnScreen(
                         )
                         val createRes = resolvedApiService.createYarn(createReq)
                         if (!createRes.isSuccessful || createRes.body() == null) {
+                            deleteCroppedImageFile(context, localImageUri)
                             val msg = if (createRes.code() == 422) "입력값 형식(날짜 YYYY-MM-DD 등)을 확인해 주세요"
                             else "실 등록에 실패했어요 (${createRes.code()})"
                             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
@@ -295,23 +293,30 @@ fun YarnScreen(
 
                         var createdYarn = createRes.body()!!
 
-                        if (localImageFile != null && localImageFile.exists()) {
-                            val part = createImageMultipart(localImageFile)
+                        val localFile = uriStringToLocalFile(localImageUri)
+                        if (localFile != null && localFile.exists()) {
+                            val part = createImageMultipart(localFile)
                             val imgRes = resolvedApiService.uploadYarnImage(createdYarn.id, part)
                             if (imgRes.isSuccessful && imgRes.body() != null) {
-                                createdYarn = imgRes.body()!!
+                                // ImageUploadResponse(image_url, thumbnail_url)만 받아 기존 YarnData에 반영
+                                val uploaded: ImageUploadResponse = imgRes.body()!!
+                                createdYarn = createdYarn.copy(
+                                    imageUrl = uploaded.imageUrl ?: createdYarn.imageUrl,
+                                    thumbnailUrl = uploaded.thumbnailUrl ?: createdYarn.thumbnailUrl
+                                )
                             } else if (imgRes.code() == 413) {
                                 Toast.makeText(context, "1MB보다 큰 사진은 올릴 수 없어요", Toast.LENGTH_SHORT).show()
                             } else {
                                 Toast.makeText(context, "라벨 사진 업로드에 실패했어요", Toast.LENGTH_SHORT).show()
                             }
-                            localImageFile.delete()
+                            deleteCroppedImageFile(context, localImageUri)
                         }
 
                         yarnList.add(0, createdYarn)
                         showAddDialog = false
                         Toast.makeText(context, "새 실이 등록되었습니다.", Toast.LENGTH_SHORT).show()
                     } catch (_: Exception) {
+                        deleteCroppedImageFile(context, localImageUri)
                         Toast.makeText(context, "네트워크 연결을 확인해 주세요", Toast.LENGTH_SHORT).show()
                     }
                 }
@@ -326,7 +331,7 @@ fun YarnScreen(
             titleText = "실 정보 수정",
             confirmText = "수정 완료",
             onDismiss = { yarnToEdit = null },
-            onConfirm = { name, color, shop, purchaseDate, memo, newLocalImageFile, removeExistingImage ->
+            onConfirm = { name, color, shop, purchaseDate, memo, newLocalImageUri, removeExistingImage ->
                 coroutineScope.launch {
                     try {
                         val updateReq = YarnUpdateRequest(
@@ -338,6 +343,7 @@ fun YarnScreen(
                         )
                         val patchRes = resolvedApiService.updateYarn(target.id, updateReq)
                         if (!patchRes.isSuccessful || patchRes.body() == null) {
+                            deleteCroppedImageFile(context, newLocalImageUri)
                             val msg = if (patchRes.code() == 422) "입력값 형식(날짜 YYYY-MM-DD 등)을 확인해 주세요"
                             else "실 정보 수정에 실패했어요 (${patchRes.code()})"
                             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
@@ -346,17 +352,23 @@ fun YarnScreen(
 
                         var updatedYarn = patchRes.body()!!
 
-                        if (newLocalImageFile != null && newLocalImageFile.exists()) {
-                            val part = createImageMultipart(newLocalImageFile)
+                        val newLocalFile = uriStringToLocalFile(newLocalImageUri)
+                        if (newLocalFile != null && newLocalFile.exists()) {
+                            val part = createImageMultipart(newLocalFile)
                             val imgRes = resolvedApiService.uploadYarnImage(target.id, part)
                             if (imgRes.isSuccessful && imgRes.body() != null) {
-                                updatedYarn = imgRes.body()!!
+                                // ImageUploadResponse(image_url, thumbnail_url)만 받아 기존 YarnData에 반영
+                                val uploaded: ImageUploadResponse = imgRes.body()!!
+                                updatedYarn = updatedYarn.copy(
+                                    imageUrl = uploaded.imageUrl ?: updatedYarn.imageUrl,
+                                    thumbnailUrl = uploaded.thumbnailUrl ?: updatedYarn.thumbnailUrl
+                                )
                             } else if (imgRes.code() == 413) {
                                 Toast.makeText(context, "1MB보다 큰 사진은 올릴 수 없어요", Toast.LENGTH_SHORT).show()
                             } else {
                                 Toast.makeText(context, "라벨 사진 변경에 실패했어요", Toast.LENGTH_SHORT).show()
                             }
-                            newLocalImageFile.delete()
+                            deleteCroppedImageFile(context, newLocalImageUri)
                         } else if (removeExistingImage && target.imageUrl != null) {
                             val delImgRes = resolvedApiService.deleteYarnImage(target.id)
                             if (delImgRes.isSuccessful || delImgRes.code() == 204) {
@@ -374,6 +386,7 @@ fun YarnScreen(
                         yarnToEdit = null
                         Toast.makeText(context, "실 정보가 수정되었습니다.", Toast.LENGTH_SHORT).show()
                     } catch (_: Exception) {
+                        deleteCroppedImageFile(context, newLocalImageUri)
                         Toast.makeText(context, "네트워크 연결을 확인해 주세요", Toast.LENGTH_SHORT).show()
                     }
                 }
@@ -446,11 +459,16 @@ private fun YarnImageBox(
                                 BitmapFactory.decodeStream(stream)?.asImageBitmap()
                             }
                         } else {
-                            val file = File(imageSource)
-                            if (file.exists()) {
-                                BitmapFactory.decodeFile(file.absolutePath)?.asImageBitmap()
+                            val parsed = Uri.parse(imageSource)
+                            val localFile = if (parsed.scheme == "file" && parsed.path != null) {
+                                File(parsed.path!!)
                             } else {
-                                context.contentResolver.openInputStream(Uri.parse(imageSource))?.use {
+                                File(imageSource)
+                            }
+                            if (localFile.exists()) {
+                                BitmapFactory.decodeFile(localFile.absolutePath)?.asImageBitmap()
+                            } else {
+                                context.contentResolver.openInputStream(parsed)?.use {
                                     BitmapFactory.decodeStream(it)?.asImageBitmap()
                                 }
                             }
@@ -643,12 +661,11 @@ private fun YarnFormDialog(
         shop: String,
         purchaseDate: String,
         memo: String,
-        newLocalImageFile: File?,
+        newLocalImageUri: String?,
         removeExistingImage: Boolean
     ) -> Unit
 ) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
 
     var name by remember { mutableStateOf(initialYarn?.name ?: "") }
     var color by remember { mutableStateOf(initialYarn?.color ?: "") }
@@ -656,29 +673,39 @@ private fun YarnFormDialog(
     var purchaseDate by remember { mutableStateOf(initialYarn?.purchaseDate ?: "") }
     var memo by remember { mutableStateOf(initialYarn?.memo ?: "") }
 
-    var pendingImageFile by remember { mutableStateOf<File?>(null) }
+    var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
+    var selectedCroppedUri by remember { mutableStateOf<String?>(null) }
     var removeExistingImage by remember { mutableStateOf(false) }
+
+    val handleDismiss = {
+        deleteCroppedImageFile(context, selectedCroppedUri)
+        onDismiss()
+    }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         if (uri != null) {
-            coroutineScope.launch {
-                val preparedFile = prepareSquareJpegFile(context, uri)
-                if (preparedFile != null) {
-                    pendingImageFile?.delete()
-                    pendingImageFile = preparedFile
-                    removeExistingImage = false
-                } else {
-                    Toast.makeText(context, "사진을 불러오지 못했어요", Toast.LENGTH_SHORT).show()
-                }
-            }
+            pendingCropUri = uri
         }
+    }
+
+    if (pendingCropUri != null) {
+        ImageCropDialog(
+            imageUri = pendingCropUri!!,
+            onDismiss = { pendingCropUri = null },
+            onCropComplete = { croppedUri ->
+                deleteCroppedImageFile(context, selectedCroppedUri)
+                selectedCroppedUri = croppedUri.toString()
+                removeExistingImage = false
+                pendingCropUri = null
+            }
+        )
     }
 
     val existingUrl = initialYarn?.imageUrl
     val previewModel: Any? = when {
-        pendingImageFile != null -> pendingImageFile
+        selectedCroppedUri != null -> selectedCroppedUri
         !removeExistingImage && !existingUrl.isNullOrBlank() -> existingUrl
         else -> null
     }
@@ -686,10 +713,7 @@ private fun YarnFormDialog(
     val isDateValid = remember(purchaseDate) { isValidPurchaseDate(purchaseDate) }
 
     AlertDialog(
-        onDismissRequest = {
-            pendingImageFile?.delete()
-            onDismiss()
-        },
+        onDismissRequest = handleDismiss,
         title = { Text(titleText, fontWeight = FontWeight.Bold) },
         text = {
             Column(
@@ -734,8 +758,8 @@ private fun YarnFormDialog(
                         if (previewModel != null) {
                             TextButton(
                                 onClick = {
-                                    pendingImageFile?.delete()
-                                    pendingImageFile = null
+                                    deleteCroppedImageFile(context, selectedCroppedUri)
+                                    selectedCroppedUri = null
                                     removeExistingImage = true
                                 },
                                 contentPadding = PaddingValues(0.dp)
@@ -809,7 +833,7 @@ private fun YarnFormDialog(
                             shop,
                             purchaseDate,
                             memo,
-                            pendingImageFile,
+                            selectedCroppedUri,
                             removeExistingImage
                         )
                     }
@@ -821,12 +845,7 @@ private fun YarnFormDialog(
             }
         },
         dismissButton = {
-            TextButton(
-                onClick = {
-                    pendingImageFile?.delete()
-                    onDismiss()
-                }
-            ) {
+            TextButton(onClick = handleDismiss) {
                 Text("취소", color = Color.Gray)
             }
         }
@@ -856,62 +875,15 @@ private fun isValidPurchaseDate(raw: String): Boolean {
     }
 }
 
-private suspend fun prepareSquareJpegFile(context: Context, uri: Uri): File? = withContext(Dispatchers.IO) {
-    try {
-        val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        context.contentResolver.openInputStream(uri)?.use {
-            BitmapFactory.decodeStream(it, null, boundsOptions)
-        }
-        val origW = boundsOptions.outWidth
-        val origH = boundsOptions.outHeight
-        if (origW <= 0 || origH <= 0) return@withContext null
-
-        var sampleSize = 1
-        while (origW / sampleSize > 1600 || origH / sampleSize > 1600) {
-            sampleSize *= 2
-        }
-
-        val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize }
-        val decoded = context.contentResolver.openInputStream(uri)?.use {
-            BitmapFactory.decodeStream(it, null, decodeOptions)
-        } ?: return@withContext null
-
-        val rotationDegrees = context.contentResolver.openInputStream(uri)?.use { input ->
-            val exif = ExifInterface(input)
-            when (exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
-                ExifInterface.ORIENTATION_ROTATE_90 -> 90f
-                ExifInterface.ORIENTATION_ROTATE_180 -> 180f
-                ExifInterface.ORIENTATION_ROTATE_270 -> 270f
-                else -> 0f
-            }
-        } ?: 0f
-
-        val rotated = if (rotationDegrees != 0f) {
-            val matrix = Matrix().apply { postRotate(rotationDegrees) }
-            Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, matrix, true).also {
-                if (it != decoded) decoded.recycle()
-            }
+private fun uriStringToLocalFile(uriString: String?): File? {
+    if (uriString.isNullOrBlank()) return null
+    return try {
+        val parsed = Uri.parse(uriString)
+        if (parsed.scheme == "file" && parsed.path != null) {
+            File(parsed.path!!)
         } else {
-            decoded
+            null
         }
-
-        val side = minOf(rotated.width, rotated.height)
-        val x = (rotated.width - side) / 2
-        val y = (rotated.height - side) / 2
-        val cropped = Bitmap.createBitmap(rotated, x, y, side, side)
-        if (cropped != rotated) rotated.recycle()
-
-        val scaled = cropped.scale(800, 800)
-        if (scaled != cropped) cropped.recycle()
-
-        val dir = File(context.filesDir, "yarn_temp").apply { mkdirs() }
-        val outFile = File(dir, "yarn_${System.currentTimeMillis()}.jpg")
-        FileOutputStream(outFile).use { out ->
-            scaled.compress(Bitmap.CompressFormat.JPEG, 85, out)
-        }
-        scaled.recycle()
-
-        outFile
     } catch (_: Exception) {
         null
     }
