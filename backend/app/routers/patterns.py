@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from typing import List, Optional
-from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import case, func, literal, or_
 from sqlalchemy.orm import Session
 
@@ -9,6 +9,7 @@ from app.dependencies import get_current_user
 from app.errors import ApiError
 from app.models.pattern import Pattern
 from app.models.user import User
+from app.routers.photos import delete_photo_files
 from app.schemas.pattern import (
     PatternCreate,
     PatternResponse,
@@ -16,12 +17,7 @@ from app.schemas.pattern import (
     PatternTag,
     PatternUpdate,
 )
-from app.utils.storage import (
-    delete_private_image,
-    get_private_image_bytes,
-    process_square_jpeg,
-    upload_private_image,
-)
+from app.storage import get_private_storage
 
 router = APIRouter(prefix="/patterns", tags=["Patterns"])
 
@@ -131,7 +127,6 @@ def create_pattern(
         tag=req.tag,
         status=req.status,
         link_url=validated_url,
-        finished_photo_key=req.finished_photo_key,
     )
     db.add(new_pattern)
     db.commit()
@@ -196,7 +191,7 @@ def delete_pattern(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """도안 삭제 (첨부된 완성작 사진도 함께 정리)"""
+    """도안 삭제 (첨부된 완성작 사진도 비공개 스토리지에서 함께 정리)"""
     pattern = (
         db.query(Pattern)
         .filter(Pattern.id == pattern_id, Pattern.user_id == current_user.id)
@@ -208,88 +203,6 @@ def delete_pattern(
     old_key = pattern.finished_photo_key
     db.delete(pattern)
     db.commit()
-    if old_key:
-        delete_private_image(old_key)
-
-
-@router.put("/{pattern_id}/image", response_model=PatternResponse)
-async def upload_pattern_image(
-    pattern_id: int,
-    file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """도안 완성작 사진 등록 및 교체 (800x800 원본 + 300x300 썸네일)"""
-    pattern = (
-        db.query(Pattern)
-        .filter(Pattern.id == pattern_id, Pattern.user_id == current_user.id)
-        .first()
-    )
-    if not pattern:
-        raise ApiError(404, "PATTERN_NOT_FOUND", "도안을 찾을 수 없어요")
-
-    main_bytes, thumb_bytes = await process_square_jpeg(file)
-    new_key = upload_private_image(f"patterns/{pattern.id}", main_bytes, thumb_bytes)
-
-    old_key = pattern.finished_photo_key
-    pattern.finished_photo_key = new_key
-    pattern.updated_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(pattern)
-
-    if old_key and old_key != new_key:
-        delete_private_image(old_key)
-
-    return pattern
-
-
-@router.get("/{pattern_id}/image")
-def download_pattern_image(
-    pattern_id: int,
-    request: Request,
-    thumb: bool = Query(False, description="true면 300px 썸네일 반환"),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """도안 완성작 비공개 사진 조회 (본인만 접근 가능)"""
-    pattern = (
-        db.query(Pattern)
-        .filter(Pattern.id == pattern_id, Pattern.user_id == current_user.id)
-        .first()
-    )
-    if not pattern or not pattern.finished_photo_key:
-        raise ApiError(404, "IMAGE_NOT_FOUND", "이미지를 찾을 수 없어요")
-
-    image_bytes, etag = get_private_image_bytes(pattern.finished_photo_key, thumb=thumb)
-    if etag and request.headers.get("if-none-match") == etag:
-        return Response(status_code=304)
-
-    headers = {"Cache-Control": "private, max-age=3600"}
-    if etag:
-        headers["ETag"] = etag
-
-    return Response(content=image_bytes, media_type="image/jpeg", headers=headers)
-
-
-@router.delete("/{pattern_id}/image", status_code=204)
-def remove_pattern_image(
-    pattern_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """도안 완성작 사진만 삭제"""
-    pattern = (
-        db.query(Pattern)
-        .filter(Pattern.id == pattern_id, Pattern.user_id == current_user.id)
-        .first()
-    )
-    if not pattern:
-        raise ApiError(404, "PATTERN_NOT_FOUND", "도안을 찾을 수 없어요")
-
-    old_key = pattern.finished_photo_key
-    pattern.finished_photo_key = None
-    pattern.updated_at = datetime.now(timezone.utc)
-    db.commit()
 
     if old_key:
-        delete_private_image(old_key)
+        delete_photo_files(get_private_storage(), old_key)
