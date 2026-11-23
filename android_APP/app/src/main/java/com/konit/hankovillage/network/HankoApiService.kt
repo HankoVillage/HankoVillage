@@ -3,6 +3,7 @@ package com.konit.hankovillage.network
 import com.google.gson.annotations.SerializedName
 import com.konit.hankovillage.ui.counter.ProjectCounterUpdateRequest
 import com.konit.hankovillage.ui.counter.ProjectData
+import com.konit.hankovillage.ui.pattern.ImageUploadResponse
 import com.konit.hankovillage.ui.pattern.PatternCreateRequest
 import com.konit.hankovillage.ui.pattern.PatternData
 import com.konit.hankovillage.ui.pattern.PatternUpdateRequest
@@ -155,7 +156,7 @@ interface HankoApiService {
     suspend fun uploadPatternImage(
         @Path("pattern_id") patternId: Long,
         @Part file: MultipartBody.Part
-    ): Response<PatternData>
+    ): Response<ImageUploadResponse>
 
     /**
      * 특정 도안에 등록된 이미지를 삭제합니다.
@@ -164,6 +165,8 @@ interface HankoApiService {
     suspend fun deletePatternImage(
         @Path("pattern_id") patternId: Long
     ): Response<Unit>
+
+
 }
 
 /**

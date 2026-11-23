@@ -128,3 +128,10 @@ data class PatternUpdateRequest(
     @SerializedName("yarn_info")
     val yarnInfo: String? = null
 )
+data class ImageUploadResponse(
+    @SerializedName("image_url")
+    val imageUrl: String? = null,
+
+    @SerializedName("thumbnail_url")
+    val thumbnailUrl: String? = null
+)
