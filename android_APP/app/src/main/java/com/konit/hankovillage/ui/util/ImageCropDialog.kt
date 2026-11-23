@@ -11,6 +11,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -292,5 +294,44 @@ fun deleteCroppedImageFile(context: Context, uriString: String?) {
         }
     } catch (e: Exception) {
         e.printStackTrace()
+    }
+}
+@Composable
+fun UriImage(
+    uriString: String,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop
+) {
+    val context = LocalContext.current
+    val bitmap = remember(uriString) {
+        try {
+            val uri = android.net.Uri.parse(uriString)
+            context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                android.graphics.BitmapFactory.decodeStream(inputStream)?.asImageBitmap()
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    if (bitmap != null) {
+        androidx.compose.foundation.Image(
+            bitmap = bitmap,
+            contentDescription = contentDescription,
+            modifier = modifier,
+            contentScale = contentScale
+        )
+    } else {
+        Box(
+            modifier = modifier.background(Color(0xFFDCD7C9)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.BrokenImage,
+                contentDescription = contentDescription,
+                tint = Color.Gray
+            )
+        }
     }
 }

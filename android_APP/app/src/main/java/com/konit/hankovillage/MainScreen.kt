@@ -44,8 +44,10 @@ import com.konit.hankovillage.ui.counter.ProjectCounterUpdateRequest
 import com.konit.hankovillage.ui.counter.ProjectData
 import com.konit.hankovillage.ui.counter.ProjectDataSaver
 import com.konit.hankovillage.ui.counter.ProjectListScreen
+import com.konit.hankovillage.ui.pattern.PatternCreateRequest
 import com.konit.hankovillage.ui.pattern.PatternData
 import com.konit.hankovillage.ui.pattern.PatternScreen
+import com.konit.hankovillage.ui.pattern.PatternUpdateRequest
 import com.konit.hankovillage.ui.profile.ProfileScreen
 import com.konit.hankovillage.ui.profile.UserProfileData
 import com.konit.hankovillage.ui.yarn.YarnData
@@ -70,7 +72,7 @@ sealed class BottomNavItem(val title: String, val route: String) {
  * 앱의 메인 화면 컴포저블입니다.
  *
  * 하단 네비게이션 바 제어, 로그인 세션 상태 및 회원가입 흐름 관리,
- * 프로젝트 API 연동 및 비회원 로컬 저장소 동기화를 담당합니다.
+ * 프로젝트·도안 API 연동 및 비회원 로컬 저장소 동기화를 담당합니다.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -172,10 +174,12 @@ fun MainScreen() {
             val savedGuestProjects = GuestProjectStorage.loadProjects(context)
             projectList.clear()
             projectList.addAll(savedGuestProjects)
+            patternList.clear()
             return@LaunchedEffect
         }
 
         projectList.clear()
+        patternList.clear()
 
         try {
             val response = apiService.getProjects()
@@ -184,7 +188,16 @@ fun MainScreen() {
                     projectList.addAll(serverList)
                 }
             } else {
-                Toast.makeText(context, "목록 불러오기 실패 (${response.code()})", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "프로젝트 불러오기 실패 (${response.code()})", Toast.LENGTH_SHORT).show()
+            }
+
+            val patternResponse = apiService.getPatterns(limit = 100)
+            if (patternResponse.isSuccessful) {
+                patternResponse.body()?.let { serverPatterns ->
+                    patternList.addAll(serverPatterns)
+                }
+            } else {
+                Toast.makeText(context, "도안 불러오기 실패 (${patternResponse.code()})", Toast.LENGTH_SHORT).show()
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
@@ -276,7 +289,55 @@ fun MainScreen() {
             }
 
             composable(BottomNavItem.Pattern.route) {
-                PatternScreen(patternList = patternList)
+                PatternScreen(
+                    patternList = patternList,
+                    isLoggedIn = currentUserSession != null
+                )
+            }
+
+            composable(BottomNavItem.Profile.route) {
+                val currentSession = currentUserSession
+                if (currentSession == null) {
+                    if (pendingSignupToken != null) {
+                        SignupScreen(
+                            signupToken = pendingSignupToken!!,
+                            onSignupSuccess = { session ->
+                                pendingSignupToken = null
+                                currentUserSession = session
+                            },
+                            onCancelOrExpired = {
+                                pendingSignupToken = null
+                            }
+                        )
+                    } else {
+                        LoginScreen(
+                            onLoginSuccess = { session ->
+                                currentUserSession = session
+                            },
+                            onGuestMode = {
+                                navController.navigate(BottomNavItem.Home.route)
+                            },
+                            onSignupRequired = { signupToken, provider ->
+                                pendingSignupToken = signupToken
+                                pendingSignupProvider = provider
+                            }
+                        )
+                    }
+                } else {
+                    ProfileScreen(
+                        userProfile = currentSession.profile,
+                        postList = postList,
+                        patternList = patternList,
+                        onUpdateProfile = { updatedProfile ->
+                            currentUserSession = currentUserSession?.copy(profile = updatedProfile)
+                        },
+                        onLogout = {
+                            currentUserSession = null
+                            patternList.clear()
+                            navController.navigate(BottomNavItem.Home.route)
+                        }
+                    )
+                }
             }
 
             composable(BottomNavItem.Home.route) {

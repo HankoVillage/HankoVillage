@@ -45,12 +45,12 @@ import com.konit.hankovillage.network.SocialLoginRequest
 import com.konit.hankovillage.ui.community.PostData
 import com.konit.hankovillage.ui.pattern.PatternData
 import com.konit.hankovillage.ui.pattern.PatternStatus
-import com.konit.hankovillage.ui.pattern.UriImage
 import com.konit.hankovillage.ui.theme.BgColor
 import com.konit.hankovillage.ui.theme.CardBg
 import com.konit.hankovillage.ui.theme.PointOrange
 import com.konit.hankovillage.ui.theme.TextDark
 import com.konit.hankovillage.ui.util.ImageCropDialog
+import com.konit.hankovillage.ui.util.UriImage
 import com.konit.hankovillage.ui.util.deleteCroppedImageFile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
