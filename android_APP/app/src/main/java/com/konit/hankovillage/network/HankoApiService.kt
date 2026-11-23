@@ -7,6 +7,9 @@ import com.konit.hankovillage.ui.pattern.ImageUploadResponse
 import com.konit.hankovillage.ui.pattern.PatternCreateRequest
 import com.konit.hankovillage.ui.pattern.PatternData
 import com.konit.hankovillage.ui.pattern.PatternUpdateRequest
+import com.konit.hankovillage.ui.yarn.YarnCreateRequest
+import com.konit.hankovillage.ui.yarn.YarnData
+import com.konit.hankovillage.ui.yarn.YarnUpdateRequest
 import okhttp3.MultipartBody
 import retrofit2.Response
 import retrofit2.http.Body
@@ -110,6 +113,45 @@ interface HankoApiService {
     @GET("users/me")
     suspend fun getMyProfile(): Response<AuthUserResponse>
 
+    // 1. 실 목록 조회 (최신순: NEWEST, 이름순: NAME)
+    @GET("yarns")
+    suspend fun getYarns(
+        @Query("sort") sort: String = "NEWEST",
+        @Query("limit") limit: Int = 20,
+        @Query("offset") offset: Int = 0
+    ): Response<List<YarnData>>
+
+    // 2. 새 실 등록 (텍스트 정보)
+    @POST("yarns")
+    suspend fun createYarn(@Body request: YarnCreateRequest): Response<YarnData>
+
+    // 3. 실 상세 조회
+    @GET("yarns/{id}")
+    suspend fun getYarnDetail(@Path("id") yarnId: Long): Response<YarnData>
+
+    // 4. 실 정보 수정
+    @PATCH("yarns/{id}")
+    suspend fun updateYarn(
+        @Path("id") yarnId: Long,
+        @Body request: YarnUpdateRequest
+    ): Response<YarnData>
+
+    // 5. 실 삭제
+    @DELETE("yarns/{id}")
+    suspend fun deleteYarn(@Path("id") yarnId: Long): Response<Unit>
+
+    // 6. 라벨 사진 업로드/교체 (800x800 JPEG Multipart)
+    @Multipart
+    @PUT("yarns/{id}/image")
+    suspend fun uploadYarnImage(
+        @Path("id") yarnId: Long,
+        @Part file: MultipartBody.Part
+    ): Response<ImageUploadResponse>
+
+    // 7. 라벨 사진만 삭제
+    @DELETE("yarns/{id}/image")
+    suspend fun deleteYarnImage(@Path("id") yarnId: Long): Response<Unit>
+
     /**
      * 검색어, 태그, 진행 상태 및 정렬 기준에 따라 도안 목록을 조회합니다.
      */
@@ -165,8 +207,6 @@ interface HankoApiService {
     suspend fun deletePatternImage(
         @Path("pattern_id") patternId: Long
     ): Response<Unit>
-
-
 }
 
 /**

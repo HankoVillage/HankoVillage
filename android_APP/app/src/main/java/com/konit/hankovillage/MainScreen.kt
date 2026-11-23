@@ -285,7 +285,11 @@ fun MainScreen() {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(BottomNavItem.Yarn.route) {
-                YarnScreen(yarnList = yarnList)
+                YarnScreen(
+                    yarnList = yarnList,
+                    projectList = projectList,
+                    isLoggedIn = currentUserSession != null
+                )
             }
 
             composable(BottomNavItem.Pattern.route) {
