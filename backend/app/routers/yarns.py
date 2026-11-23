@@ -10,6 +10,7 @@ from app.models.yarn import Yarn
 from app.routers.photos import delete_photo_files
 from app.schemas.yarn import YarnCreate, YarnResponse, YarnUpdate
 from app.storage import get_private_storage
+from app.routers.photos import delete_photo_files
 
 router = APIRouter(prefix="/yarns", tags=["Yarns"])
 
@@ -129,4 +130,4 @@ def delete_yarn(
         storage = get_private_storage()
         delete_photo_files(storage, old_key)
 
-    return None
+    return None 
