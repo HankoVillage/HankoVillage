@@ -59,9 +59,6 @@ import java.io.File
 val AvailableTags = listOf("의류", "목도리", "모자", "가방", "인형", "기타")
 private const val BASE_IMAGE_HOST = "https://api.hankovillage.com"
 
-/**
- * 로컬 file:// URI와 백엔드 비공개 경로(/patterns/{id}/image)를 모두 안전하게 로드하는 컴포저블
- */
 @Composable
 fun PatternImage(
     imageSource: String,
@@ -91,7 +88,6 @@ fun PatternImage(
             ImagePlaceholder(modifier)
         }
     } else {
-        // 서버 상대 경로("/patterns/{id}/image") 또는 전체 URL 처리 (JWT 인증 헤더 포함)
         val fullUrl = if (imageSource.startsWith("http")) imageSource else "$BASE_IMAGE_HOST$imageSource"
         var remoteBitmap by remember(fullUrl) { mutableStateOf<android.graphics.Bitmap?>(null) }
 
@@ -140,9 +136,6 @@ private fun ImagePlaceholder(modifier: Modifier = Modifier) {
     }
 }
 
-/**
- * 로컬 file:// Uri를 Retrofit MultipartBody.Part로 변환
- */
 private fun uriToMultipartPart(uriString: String): MultipartBody.Part? {
     return try {
         val uri = Uri.parse(uriString)
@@ -156,9 +149,6 @@ private fun uriToMultipartPart(uriString: String): MultipartBody.Part? {
     }
 }
 
-/**
- * URL 형식 검사 (비어있으면 null, 값이 있으면 http/https 시작 여부 검증)
- */
 private fun validateAndFormatUrl(context: Context, rawUrl: String): Pair<Boolean, String?> {
     val trimmed = rawUrl.trim()
     if (trimmed.isBlank()) return true to null
@@ -169,9 +159,6 @@ private fun validateAndFormatUrl(context: Context, rawUrl: String): Pair<Boolean
     return true to trimmed
 }
 
-/**
- * 도안 보관소 메인 화면 컴포저블
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PatternScreen(
@@ -195,13 +182,11 @@ fun PatternScreen(
 
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedStatusFilter by rememberSaveable { mutableStateOf<PatternStatus?>(null) }
-    var selectedTagFilter by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedSortOrder by rememberSaveable { mutableStateOf(PatternSortOrder.NEWEST) }
 
     var selectedPattern by remember { mutableStateOf<PatternData?>(null) }
     var showUploadDialog by rememberSaveable { mutableStateOf(false) }
 
-    // 화면 진입 시 로그인 상태라면 서버 목록 동기화
     LaunchedEffect(isLoggedIn) {
         if (isLoggedIn) {
             try {
@@ -224,8 +209,7 @@ fun PatternScreen(
         } else true
 
         val matchesStatus = selectedStatusFilter?.let { pattern.status == it } ?: true
-        val matchesTag = selectedTagFilter?.let { pattern.tag == it } ?: true
-        matchesQuery && matchesStatus && matchesTag
+        matchesQuery && matchesStatus
     }.sortedWith { p1, p2 ->
         if (selectedSortOrder == PatternSortOrder.NEWEST) p2.id.compareTo(p1.id)
         else p1.title.compareTo(p2.title)
@@ -306,7 +290,6 @@ fun PatternScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // 1. 진행 상태 필터 + 정렬
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -376,7 +359,6 @@ fun PatternScreen(
                 if (isLoggedIn) {
                     coroutineScope.launch {
                         try {
-                            // 1단계: POST /patterns 로 도안 생성 및 ID 발급
                             val createRes = resolvedApiService.createPattern(
                                 PatternCreateRequest(
                                     title = draftPattern.title,
@@ -389,13 +371,16 @@ fun PatternScreen(
                             if (createRes.isSuccessful && createRes.body() != null) {
                                 var created = createRes.body()!!
 
-                                // 2단계: 선택한 사진이 있으면 PUT /patterns/{id}/image 업로드
                                 if (!localImageUri.isNullOrBlank()) {
                                     val part = uriToMultipartPart(localImageUri)
                                     if (part != null) {
                                         val imgRes = resolvedApiService.uploadPatternImage(created.id, part)
                                         if (imgRes.isSuccessful && imgRes.body() != null) {
-                                            created = imgRes.body()!!
+                                            val uploaded = imgRes.body()!!
+                                            created = created.copy(
+                                                imageUrl = uploaded.imageUrl ?: created.imageUrl,
+                                                thumbnailUrl = uploaded.thumbnailUrl ?: created.thumbnailUrl
+                                            )
                                         }
                                     }
                                     deleteCroppedImageFile(context, localImageUri)
@@ -419,23 +404,12 @@ fun PatternScreen(
     }
 }
 
-/**
- * 개별 도안 카드 아이템 (1:1 비율 보정, 목록은 thumbnailUrl 우선 사용)
- */
 @Composable
 fun PatternCardItem(
     pattern: PatternData,
     onClick: () -> Unit
 ) {
     val displayImage = pattern.thumbnailUrl ?: pattern.imageUrl
-    if (!displayImage.isNullOrEmpty()) {
-        PatternImage(
-            imageSource = displayImage,
-            contentDescription = pattern.title,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
-        )
-    }
 
     Card(
         onClick = onClick,
@@ -511,9 +485,6 @@ fun PatternCardItem(
     }
 }
 
-/**
- * 도안 상세 보기 화면 (1:1 크롭 다이얼로그 및 서버 API 연동)
- */
 @Composable
 fun PatternDetailContent(
     pattern: PatternData,
@@ -554,7 +525,13 @@ fun PatternDetailContent(
                             if (part != null) {
                                 val res = resolvedApiService.uploadPatternImage(pattern.id, part)
                                 if (res.isSuccessful && res.body() != null) {
-                                    onUpdate(res.body()!!)
+                                    val uploaded = res.body()!!
+                                    onUpdate(
+                                        pattern.copy(
+                                            imageUrl = uploaded.imageUrl ?: pattern.imageUrl,
+                                            thumbnailUrl = uploaded.thumbnailUrl ?: pattern.thumbnailUrl
+                                        )
+                                    )
                                     Toast.makeText(context, "사진이 등록되었습니다.", Toast.LENGTH_SHORT).show()
                                 } else {
                                     Toast.makeText(context, "사진 업로드 실패 (${res.code()})", Toast.LENGTH_SHORT).show()
@@ -805,7 +782,6 @@ fun PatternDetailContent(
                 if (isLoggedIn) {
                     coroutineScope.launch {
                         try {
-                            // 1단계: PATCH /patterns/{id} 텍스트 정보 수정
                             val patchRes = resolvedApiService.updatePattern(
                                 pattern.id,
                                 PatternUpdateRequest(
@@ -819,13 +795,16 @@ fun PatternDetailContent(
                             if (patchRes.isSuccessful && patchRes.body() != null) {
                                 var latest = patchRes.body()!!
 
-                                // 2단계: 새 사진이 선택된 경우 PUT /patterns/{id}/image 호출
                                 if (newLocalImageUri != null && newLocalImageUri.startsWith("file://")) {
                                     val part = uriToMultipartPart(newLocalImageUri)
                                     if (part != null) {
                                         val imgRes = resolvedApiService.uploadPatternImage(pattern.id, part)
                                         if (imgRes.isSuccessful && imgRes.body() != null) {
-                                            latest = imgRes.body()!!
+                                            val uploaded = imgRes.body()!!
+                                            latest = latest.copy(
+                                                imageUrl = uploaded.imageUrl ?: latest.imageUrl,
+                                                thumbnailUrl = uploaded.thumbnailUrl ?: latest.thumbnailUrl
+                                            )
                                         }
                                     }
                                     deleteCroppedImageFile(context, newLocalImageUri)
@@ -892,9 +871,6 @@ fun PatternDetailContent(
     }
 }
 
-/**
- * 신규 도안 등록 다이얼로그 (1:1 크롭 다이얼로그 연동)
- */
 @Composable
 fun PatternUploadDialog(
     onDismiss: () -> Unit,
@@ -1050,9 +1026,6 @@ fun PatternUploadDialog(
     )
 }
 
-/**
- * 기존 도안 정보 수정 다이얼로그 (1:1 크롭 다이얼로그 연동)
- */
 @Composable
 fun PatternEditDialog(
     pattern: PatternData,
@@ -1191,6 +1164,10 @@ fun PatternEditDialog(
                     if (title.isNotBlank()) {
                         val (isValidUrl, validatedLink) = validateAndFormatUrl(context, patternUrl)
                         if (!isValidUrl) return@Button
+
+                        if (imageUri != initialImageUri) {
+                            deleteCroppedImageFile(context, initialImageUri)
+                        }
 
                         onConfirm(
                             pattern.copy(
