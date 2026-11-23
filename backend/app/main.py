@@ -31,12 +31,3 @@ app.include_router(memos.router)
 app.include_router(patterns.router)
 app.include_router(yarns.router)
 app.include_router(photos.router)
-
-
-@app.get("/health")
-def health(db: Session = Depends(get_db)):
-    try:
-        db.execute(text("SELECT 1"))
-    except Exception:
-        raise ApiError(503, "DB_UNAVAILABLE", "잠시 후 다시 시도해 주세요")
-    return {"status": "ok", "db": "ok"}
