@@ -7,6 +7,10 @@ import com.konit.hankovillage.ui.yarn.YarnCreateRequest
 import com.konit.hankovillage.ui.yarn.YarnData
 import com.konit.hankovillage.ui.yarn.YarnUpdateRequest
 import okhttp3.MultipartBody
+import com.konit.hankovillage.ui.pattern.ImageUploadResponse
+import com.konit.hankovillage.ui.pattern.PatternCreateRequest
+import com.konit.hankovillage.ui.pattern.PatternData
+import com.konit.hankovillage.ui.pattern.PatternUpdateRequest
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -23,21 +27,41 @@ import retrofit2.http.Query
  * 한코마을 백엔드 RESTful API 통신 인터페이스입니다.
  */
 interface HankoApiService {
+
+    /**
+     * 소셜 재인증 ID 토큰을 검증하여 회원 탈퇴를 처리합니다.
+     */
     @POST("users/me/withdrawal")
     suspend fun withdrawUser(
         @Body request: SocialLoginRequest
     ): Response<Unit>
+
+    /**
+     * 만료된 액세스 토큰을 리프레시 토큰으로 갱신합니다.
+     */
     @POST("auth/refresh")
-    suspend fun refreshTokens(@Body request: RefreshRequest): Response<RefreshResponse>
+    suspend fun refreshTokens(
+        @Body request: RefreshRequest
+    ): Response<RefreshResponse>
+
+    /**
+     * 서버 측 리프레시 토큰을 만료시켜 로그아웃을 처리합니다.
+     */
     @POST("auth/logout")
-    suspend fun logout(@Body request: RefreshRequest): Response<Unit>
+    suspend fun logout(
+        @Body request: RefreshRequest
+    ): Response<Unit>
+
+    /**
+     * 구글 인증 토큰(ID Token)을 전달하여 소셜 로그인 또는 가입 필요 여부를 확인합니다.
+     */
     @POST("auth/social/google")
     suspend fun socialLoginGoogle(
         @Body request: SocialLoginRequest
     ): Response<SocialLoginResponse>
 
     /**
-     * 카카오 임시 가입 토큰과 사용자 입력 프로필 정보를 전달하여 최종 회원가입을 완료합니다.
+     * 소셜 임시 가입 토큰과 사용자 입력 프로필 정보를 전달하여 최종 회원가입을 완료합니다.
      */
     @POST("auth/signup")
     suspend fun signup(
@@ -83,6 +107,9 @@ interface HankoApiService {
         @Path("id") projectId: Long
     ): Response<Unit>
 
+    /**
+     * 현재 로그인된 사용자의 기본 프로필 정보를 조회합니다.
+     */
     @GET("users/me")
     suspend fun getMyProfile(): Response<AuthUserResponse>
 
@@ -124,12 +151,70 @@ interface HankoApiService {
     // 7. 라벨 사진만 삭제
     @DELETE("yarns/{id}/image")
     suspend fun deleteYarnImage(@Path("id") yarnId: Long): Response<Unit>
+
+    /**
+     * 검색어, 태그, 진행 상태 및 정렬 기준에 따라 도안 목록을 조회합니다.
+     */
+    @GET("patterns")
+    suspend fun getPatterns(
+        @Query("search") search: String? = null,
+        @Query("tag") tag: String? = null,
+        @Query("status") status: String? = null,
+        @Query("sort") sort: String = "NEWEST",
+        @Query("limit") limit: Int = 20,
+        @Query("offset") offset: Int = 0
+    ): Response<List<PatternData>>
+
+    /**
+     * 신규 도안 정보를 등록합니다.
+     */
+    @POST("patterns")
+    suspend fun createPattern(
+        @Body request: PatternCreateRequest
+    ): Response<PatternData>
+
+    /**
+     * 기존 도안의 상세 정보를 수정합니다.
+     */
+    @PATCH("patterns/{pattern_id}")
+    suspend fun updatePattern(
+        @Path("pattern_id") patternId: Long,
+        @Body request: PatternUpdateRequest
+    ): Response<PatternData>
+
+    /**
+     * 지정한 도안을 삭제합니다.
+     */
+    @DELETE("patterns/{pattern_id}")
+    suspend fun deletePattern(
+        @Path("pattern_id") patternId: Long
+    ): Response<Unit>
+
+    /**
+     * 특정 도안의 대표 이미지를 업로드하거나 교체합니다.
+     */
+    @Multipart
+    @PUT("patterns/{pattern_id}/image")
+    suspend fun uploadPatternImage(
+        @Path("pattern_id") patternId: Long,
+        @Part file: MultipartBody.Part
+    ): Response<ImageUploadResponse>
+
+    /**
+     * 특정 도안에 등록된 이미지를 삭제합니다.
+     */
+    @DELETE("patterns/{pattern_id}/image")
+    suspend fun deletePatternImage(
+        @Path("pattern_id") patternId: Long
+    ): Response<Unit>
+
+
 }
 
 /**
- * 소셜 로그인 요청 DTO입니다.
+ * 소셜 로그인 및 재인증 요청 DTO입니다.
  *
- * @property token 소셜 인프라(카카오 등)로부터 전달받은 OIDC ID 토큰
+ * @property token 소셜 인프라(카카오, 구글 등)로부터 전달받은 OIDC ID 토큰
  */
 data class SocialLoginRequest(
     @SerializedName("token")
@@ -192,14 +277,28 @@ data class SignupRequest(
     val termsAgreed: Boolean = true
 )
 
+/**
+ * 액세스 토큰 갱신 및 로그아웃 요청 DTO입니다.
+ */
 data class RefreshRequest(
-    @SerializedName("refresh_token") val refreshToken: String
+    @SerializedName("refresh_token")
+    val refreshToken: String
 )
 
+/**
+ * 토큰 갱신 성공 시 반환되는 신규 토큰 쌍 응답 DTO입니다.
+ */
 data class RefreshResponse(
-    @SerializedName("access_token") val accessToken: String,
-    @SerializedName("refresh_token") val refreshToken: String,
-    @SerializedName("token_type") val tokenType: String,
-    @SerializedName("expires_in") val expiresIn: Int
+    @SerializedName("access_token")
+    val accessToken: String,
+
+    @SerializedName("refresh_token")
+    val refreshToken: String,
+
+    @SerializedName("token_type")
+    val tokenType: String,
+
+    @SerializedName("expires_in")
+    val expiresIn: Int
 )
 

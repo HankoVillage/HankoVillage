@@ -1,5 +1,6 @@
 package com.konit.hankovillage.ui.pattern
 
+import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -35,76 +36,149 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.konit.hankovillage.network.HankoApiService
+import com.konit.hankovillage.network.RetrofitInstance
+import com.konit.hankovillage.network.SessionManager
 import com.konit.hankovillage.ui.theme.BgColor
 import com.konit.hankovillage.ui.theme.CardBg
 import com.konit.hankovillage.ui.theme.PointOrange
 import com.konit.hankovillage.ui.theme.TextDark
 import com.konit.hankovillage.ui.util.ImageCropDialog
+import com.konit.hankovillage.ui.util.decodeSampledBitmapFromUri
 import com.konit.hankovillage.ui.util.deleteCroppedImageFile
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.asRequestBody
+import java.io.File
 
 val AvailableTags = listOf("의류", "목도리", "모자", "가방", "인형", "기타")
+private const val BASE_IMAGE_HOST = "https://api.hankovillage.com"
 
-/**
- * URI 스트링을 Compose ImageBitmap으로 로드해주는 헬퍼 컴포저블
- */
 @Composable
-fun UriImage(
-    uriString: String,
+fun PatternImage(
+    imageSource: String,
     contentDescription: String?,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop
 ) {
     val context = LocalContext.current
-    val bitmap = remember(uriString) {
-        try {
-            val uri = Uri.parse(uriString)
-            context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                BitmapFactory.decodeStream(inputStream)
-            }
-        } catch (e: Exception) {
-            null
-        }
-    }
 
-    if (bitmap != null) {
-        Image(
-            bitmap = bitmap.asImageBitmap(),
-            contentDescription = contentDescription,
-            modifier = modifier,
-            contentScale = contentScale
-        )
+    if (imageSource.startsWith("file://") || imageSource.startsWith("content://")) {
+        val bitmap = remember(imageSource) {
+            decodeSampledBitmapFromUri(
+                context = context,
+                uri = Uri.parse(imageSource),
+                reqWidth = 800,
+                reqHeight = 800
+            )
+        }
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = contentDescription,
+                modifier = modifier,
+                contentScale = contentScale
+            )
+        } else {
+            ImagePlaceholder(modifier)
+        }
     } else {
-        Box(
-            modifier = modifier.background(Color.LightGray),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("--", fontSize = 20.sp)
+        val fullUrl = if (imageSource.startsWith("http")) imageSource else "$BASE_IMAGE_HOST$imageSource"
+        var remoteBitmap by remember(fullUrl) { mutableStateOf<android.graphics.Bitmap?>(null) }
+
+        LaunchedEffect(fullUrl) {
+            remoteBitmap = withContext(Dispatchers.IO) {
+                try {
+                    val token = SessionManager.getAccessToken(context)
+                    val client = OkHttpClient()
+                    val requestBuilder = Request.Builder().url(fullUrl)
+                    if (!token.isNullOrBlank()) {
+                        requestBuilder.addHeader("Authorization", "Bearer $token")
+                    }
+                    client.newCall(requestBuilder.build()).execute().use { response ->
+                        if (response.isSuccessful) {
+                            response.body?.byteStream()?.use { stream ->
+                                BitmapFactory.decodeStream(stream)
+                            }
+                        } else null
+                    }
+                } catch (_: Exception) {
+                    null
+                }
+            }
+        }
+
+        if (remoteBitmap != null) {
+            Image(
+                bitmap = remoteBitmap!!.asImageBitmap(),
+                contentDescription = contentDescription,
+                modifier = modifier,
+                contentScale = contentScale
+            )
+        } else {
+            ImagePlaceholder(modifier)
         }
     }
 }
 
-/**
- * 도안 보관소 메인 화면 컴포저블
- */
+@Composable
+private fun ImagePlaceholder(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier.background(Color.LightGray),
+        contentAlignment = Alignment.Center
+    ) {
+        Text("--", fontSize = 20.sp, color = Color.DarkGray)
+    }
+}
+
+private fun uriToMultipartPart(uriString: String): MultipartBody.Part? {
+    return try {
+        val uri = Uri.parse(uriString)
+        val path = uri.path ?: return null
+        val file = File(path)
+        if (!file.exists()) return null
+        val requestBody = file.asRequestBody("image/jpeg".toMediaTypeOrNull())
+        MultipartBody.Part.createFormData("file", file.name, requestBody)
+    } catch (_: Exception) {
+        null
+    }
+}
+
+private fun validateAndFormatUrl(context: Context, rawUrl: String): Pair<Boolean, String?> {
+    val trimmed = rawUrl.trim()
+    if (trimmed.isBlank()) return true to null
+    if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
+        Toast.makeText(context, "도안 링크는 http:// 또는 https://로 시작해야 해요.", Toast.LENGTH_SHORT).show()
+        return false to null
+    }
+    return true to trimmed
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PatternScreen(
-    patternList: SnapshotStateList<PatternData> = remember { mutableStateListOf() }
-) {
-    LaunchedEffect(Unit) {
-        if (patternList.isEmpty()) {
-            patternList.add(
-                PatternData(
-                    id = 1L,
-                    title = "가을 체크 머플러",
-                    tag = "목도리",
-                    yarnInfo = "메리노울 100g",
-                    patternUrl = "https://example.com/pattern/1",
-                    status = PatternStatus.IN_PROGRESS
-                )
-            )
-        }
+    patternList: SnapshotStateList<PatternData> = remember { mutableStateListOf() },
+    isLoggedIn: Boolean = true,
+    apiService: HankoApiService? = null,
+    onAddPattern: (PatternData) -> Unit = { newPattern -> patternList.add(0, newPattern) },
+    onUpdatePattern: (PatternData) -> Unit = { updated ->
+        val index = patternList.indexOfFirst { it.id == updated.id }
+        if (index != -1) patternList[index] = updated
+    },
+    onDeletePattern: (Long) -> Unit = { deletedId ->
+        patternList.removeIf { it.id == deletedId }
     }
+) {
+    val context = LocalContext.current
+    val resolvedApiService = remember(apiService, context) {
+        apiService ?: RetrofitInstance.getApiService(context)
+    }
+    val coroutineScope = rememberCoroutineScope()
 
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedStatusFilter by rememberSaveable { mutableStateOf<PatternStatus?>(null) }
@@ -113,11 +187,25 @@ fun PatternScreen(
     var selectedPattern by remember { mutableStateOf<PatternData?>(null) }
     var showUploadDialog by rememberSaveable { mutableStateOf(false) }
 
+    LaunchedEffect(isLoggedIn) {
+        if (isLoggedIn) {
+            try {
+                val response = resolvedApiService.getPatterns(limit = 100)
+                if (response.isSuccessful && response.body() != null) {
+                    patternList.clear()
+                    patternList.addAll(response.body()!!)
+                }
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    val trimmedQuery = searchQuery.trim()
     val filteredPatterns = patternList.filter { pattern ->
-        val matchesQuery = if (searchQuery.trim().length >= 2) {
-            pattern.title.contains(searchQuery, ignoreCase = true) ||
-                    pattern.tag.contains(searchQuery, ignoreCase = true) ||
-                    pattern.yarnInfo.contains(searchQuery, ignoreCase = true)
+        val matchesQuery = if (trimmedQuery.length >= 2) {
+            pattern.title.contains(trimmedQuery, ignoreCase = true) ||
+                    pattern.tag.equals(trimmedQuery, ignoreCase = true) ||
+                    pattern.tagCode.equals(trimmedQuery, ignoreCase = true)
         } else true
 
         val matchesStatus = selectedStatusFilter?.let { pattern.status == it } ?: true
@@ -134,14 +222,15 @@ fun PatternScreen(
 
         PatternDetailContent(
             pattern = selectedPattern!!,
+            isLoggedIn = isLoggedIn,
+            apiService = resolvedApiService,
             onBackClick = { selectedPattern = null },
             onUpdate = { updated ->
-                val index = patternList.indexOfFirst { it.id == updated.id }
-                if (index != -1) patternList[index] = updated
+                onUpdatePattern(updated)
                 selectedPattern = updated
             },
             onDelete = { deletedId ->
-                patternList.removeIf { it.id == deletedId }
+                onDeletePattern(deletedId)
                 selectedPattern = null
             }
         )
@@ -158,7 +247,7 @@ fun PatternScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "도안 보관소 ",
+                    text = "도안 보관소",
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextDark
@@ -180,14 +269,17 @@ fun PatternScreen(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("제목, 태그, 실 정보 검색 (2글자 이상)", fontSize = 13.sp) },
+                placeholder = { Text("제목, 태그 검색 (2글자 이상)", fontSize = 13.sp) },
                 leadingIcon = {
                     Icon(
                         Icons.Default.Search,
                         contentDescription = null,
-                        tint = Color.Gray
+                        tint = if (trimmedQuery.length == 1) Color.Gray else PointOrange
                     )
                 },
+                supportingText = if (trimmedQuery.length == 1) {
+                    { Text("검색어는 2글자 이상 입력해 주세요.", fontSize = 11.sp, color = Color.Gray) }
+                } else null,
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -236,8 +328,6 @@ fun PatternScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
             if (filteredPatterns.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -265,22 +355,62 @@ fun PatternScreen(
     if (showUploadDialog) {
         PatternUploadDialog(
             onDismiss = { showUploadDialog = false },
-            onConfirm = { newPattern ->
-                patternList.add(0, newPattern)
-                showUploadDialog = false
+            onConfirm = { draftPattern, localImageUri ->
+                if (isLoggedIn) {
+                    coroutineScope.launch {
+                        try {
+                            val createRes = resolvedApiService.createPattern(
+                                PatternCreateRequest(
+                                    title = draftPattern.title,
+                                    tag = draftPattern.tagCode,
+                                    status = draftPattern.statusCode,
+                                    linkUrl = draftPattern.patternUrl,
+                                    yarnInfo = draftPattern.yarnInfo
+                                )
+                            )
+                            if (createRes.isSuccessful && createRes.body() != null) {
+                                var created = createRes.body()!!
+
+                                if (!localImageUri.isNullOrBlank()) {
+                                    val part = uriToMultipartPart(localImageUri)
+                                    if (part != null) {
+                                        val imgRes = resolvedApiService.uploadPatternImage(created.id, part)
+                                        if (imgRes.isSuccessful && imgRes.body() != null) {
+                                            val uploaded = imgRes.body()!!
+                                            created = created.copy(
+                                                imageUrl = uploaded.imageUrl ?: created.imageUrl,
+                                                thumbnailUrl = uploaded.thumbnailUrl ?: created.thumbnailUrl
+                                            )
+                                        }
+                                    }
+                                    deleteCroppedImageFile(context, localImageUri)
+                                }
+
+                                onAddPattern(created)
+                                showUploadDialog = false
+                            } else {
+                                Toast.makeText(context, "등록 실패 (${createRes.code()})", Toast.LENGTH_SHORT).show()
+                            }
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "네트워크 오류: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                } else {
+                    onAddPattern(draftPattern.copy(id = System.currentTimeMillis(), imageUrl = localImageUri))
+                    showUploadDialog = false
+                }
             }
         )
     }
 }
 
-/**
- * 개별 도안 카드 아이템 (1:1 비율 보정)
- */
 @Composable
 fun PatternCardItem(
     pattern: PatternData,
     onClick: () -> Unit
 ) {
+    val displayImage = pattern.thumbnailUrl ?: pattern.imageUrl
+
     Card(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
@@ -320,9 +450,9 @@ fun PatternCardItem(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            if (!pattern.imageUrl.isNullOrEmpty()) {
-                UriImage(
-                    uriString = pattern.imageUrl!!,
+            if (!displayImage.isNullOrEmpty()) {
+                PatternImage(
+                    imageSource = displayImage,
                     contentDescription = pattern.title,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -343,7 +473,7 @@ fun PatternCardItem(
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            if (pattern.yarnInfo.isNotBlank()) {
+            if (!pattern.yarnInfo.isNullOrBlank()) {
                 Text(
                     text = "사용 실: ${pattern.yarnInfo}",
                     fontSize = 11.sp,
@@ -355,17 +485,21 @@ fun PatternCardItem(
     }
 }
 
-/**
- * 도안 상세 보기 화면 (1:1 크롭 다이얼로그 연동)
- */
 @Composable
 fun PatternDetailContent(
     pattern: PatternData,
+    isLoggedIn: Boolean = true,
+    apiService: HankoApiService? = null,
     onBackClick: () -> Unit,
     onUpdate: (PatternData) -> Unit,
     onDelete: (Long) -> Unit
 ) {
     val context = LocalContext.current
+    val resolvedApiService = remember(apiService, context) {
+        apiService ?: RetrofitInstance.getApiService(context)
+    }
+    val coroutineScope = rememberCoroutineScope()
+
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
     var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
@@ -381,9 +515,38 @@ fun PatternDetailContent(
             imageUri = pendingCropUri!!,
             onDismiss = { pendingCropUri = null },
             onCropComplete = { croppedUri ->
-                deleteCroppedImageFile(context, pattern.imageUrl)
-                onUpdate(pattern.copy(imageUrl = croppedUri.toString()))
+                val localUriStr = croppedUri.toString()
                 pendingCropUri = null
+
+                if (isLoggedIn) {
+                    coroutineScope.launch {
+                        try {
+                            val part = uriToMultipartPart(localUriStr)
+                            if (part != null) {
+                                val res = resolvedApiService.uploadPatternImage(pattern.id, part)
+                                if (res.isSuccessful && res.body() != null) {
+                                    val uploaded = res.body()!!
+                                    onUpdate(
+                                        pattern.copy(
+                                            imageUrl = uploaded.imageUrl ?: pattern.imageUrl,
+                                            thumbnailUrl = uploaded.thumbnailUrl ?: pattern.thumbnailUrl
+                                        )
+                                    )
+                                    Toast.makeText(context, "사진이 등록되었습니다.", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, "사진 업로드 실패 (${res.code()})", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "사진 업로드 오류: ${e.message}", Toast.LENGTH_SHORT).show()
+                        } finally {
+                            deleteCroppedImageFile(context, localUriStr)
+                        }
+                    }
+                } else {
+                    deleteCroppedImageFile(context, pattern.imageUrl)
+                    onUpdate(pattern.copy(imageUrl = localUriStr))
+                }
             }
         )
     }
@@ -443,8 +606,8 @@ fun PatternDetailContent(
         ) {
             if (!pattern.imageUrl.isNullOrEmpty()) {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    UriImage(
-                        uriString = pattern.imageUrl!!,
+                    PatternImage(
+                        imageSource = pattern.imageUrl!!,
                         contentDescription = pattern.title,
                         modifier = Modifier
                             .fillMaxSize()
@@ -518,7 +681,26 @@ fun PatternDetailContent(
                 FilterChip(
                     selected = isSelected,
                     onClick = {
-                        onUpdate(pattern.copy(status = statusOption))
+                        if (isSelected) return@FilterChip
+                        if (isLoggedIn) {
+                            coroutineScope.launch {
+                                try {
+                                    val res = resolvedApiService.updatePattern(
+                                        pattern.id,
+                                        PatternUpdateRequest(status = statusOption.serverCode)
+                                    )
+                                    if (res.isSuccessful && res.body() != null) {
+                                        onUpdate(res.body()!!)
+                                    } else {
+                                        Toast.makeText(context, "상태 변경 실패 (${res.code()})", Toast.LENGTH_SHORT).show()
+                                    }
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "네트워크 오류: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        } else {
+                            onUpdate(pattern.copy(statusCode = statusOption.serverCode))
+                        }
                     },
                     label = { Text(statusOption.label, fontSize = 12.sp) },
                     colors = FilterChipDefaults.filterChipColors(
@@ -542,7 +724,7 @@ fun PatternDetailContent(
             ) {
                 Text("사용 실: ", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextDark)
                 Text(
-                    if (pattern.yarnInfo.isNotBlank()) pattern.yarnInfo else "미입력",
+                    text = pattern.yarnInfo?.takeIf { it.isNotBlank() } ?: "미입력",
                     fontSize = 14.sp,
                     color = TextDark
                 )
@@ -551,11 +733,11 @@ fun PatternDetailContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        if (pattern.patternUrl.isNotBlank()) {
+        if (!pattern.patternUrl.isNullOrBlank()) {
             Button(
                 onClick = {
                     try {
-                        val rawUrl = pattern.patternUrl.trim()
+                        val rawUrl = pattern.patternUrl!!.trim()
                         val formattedUrl = if (!rawUrl.startsWith("http://") && !rawUrl.startsWith("https://")) {
                             "https://$rawUrl"
                         } else {
@@ -596,9 +778,54 @@ fun PatternDetailContent(
         PatternEditDialog(
             pattern = pattern,
             onDismiss = { showEditDialog = false },
-            onConfirm = { updated ->
-                onUpdate(updated)
-                showEditDialog = false
+            onConfirm = { updatedData, newLocalImageUri ->
+                if (isLoggedIn) {
+                    coroutineScope.launch {
+                        try {
+                            val patchRes = resolvedApiService.updatePattern(
+                                pattern.id,
+                                PatternUpdateRequest(
+                                    title = updatedData.title,
+                                    tag = updatedData.tagCode,
+                                    status = updatedData.statusCode,
+                                    linkUrl = updatedData.patternUrl,
+                                    yarnInfo = updatedData.yarnInfo
+                                )
+                            )
+                            if (patchRes.isSuccessful && patchRes.body() != null) {
+                                var latest = patchRes.body()!!
+
+                                if (newLocalImageUri != null && newLocalImageUri.startsWith("file://")) {
+                                    val part = uriToMultipartPart(newLocalImageUri)
+                                    if (part != null) {
+                                        val imgRes = resolvedApiService.uploadPatternImage(pattern.id, part)
+                                        if (imgRes.isSuccessful && imgRes.body() != null) {
+                                            val uploaded = imgRes.body()!!
+                                            latest = latest.copy(
+                                                imageUrl = uploaded.imageUrl ?: latest.imageUrl,
+                                                thumbnailUrl = uploaded.thumbnailUrl ?: latest.thumbnailUrl
+                                            )
+                                        }
+                                    }
+                                    deleteCroppedImageFile(context, newLocalImageUri)
+                                }
+
+                                onUpdate(latest)
+                                showEditDialog = false
+                            } else {
+                                Toast.makeText(context, "수정 실패 (${patchRes.code()})", Toast.LENGTH_SHORT).show()
+                            }
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "네트워크 오류: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                } else {
+                    if (newLocalImageUri != pattern.imageUrl) {
+                        deleteCroppedImageFile(context, pattern.imageUrl)
+                    }
+                    onUpdate(updatedData.copy(imageUrl = newLocalImageUri))
+                    showEditDialog = false
+                }
             }
         )
     }
@@ -611,8 +838,24 @@ fun PatternDetailContent(
             confirmButton = {
                 Button(
                     onClick = {
-                        deleteCroppedImageFile(context, pattern.imageUrl)
-                        onDelete(pattern.id)
+                        if (isLoggedIn) {
+                            coroutineScope.launch {
+                                try {
+                                    val res = resolvedApiService.deletePattern(pattern.id)
+                                    if (res.isSuccessful) {
+                                        deleteCroppedImageFile(context, pattern.imageUrl)
+                                        onDelete(pattern.id)
+                                    } else {
+                                        Toast.makeText(context, "삭제 실패 (${res.code()})", Toast.LENGTH_SHORT).show()
+                                    }
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "네트워크 오류: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        } else {
+                            deleteCroppedImageFile(context, pattern.imageUrl)
+                            onDelete(pattern.id)
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
                 ) {
@@ -628,13 +871,10 @@ fun PatternDetailContent(
     }
 }
 
-/**
- * 신규 도안 등록 다이얼로그 (1:1 크롭 다이얼로그 연동)
- */
 @Composable
 fun PatternUploadDialog(
     onDismiss: () -> Unit,
-    onConfirm: (PatternData) -> Unit
+    onConfirm: (PatternData, String?) -> Unit
 ) {
     val context = LocalContext.current
     var title by remember { mutableStateOf("") }
@@ -680,8 +920,8 @@ fun PatternUploadDialog(
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     if (!imageUri.isNullOrEmpty()) {
-                        UriImage(
-                            uriString = imageUri!!,
+                        PatternImage(
+                            imageSource = imageUri!!,
                             contentDescription = "선택한 도안 사진",
                             modifier = Modifier
                                 .fillMaxSize()
@@ -761,23 +1001,17 @@ fun PatternUploadDialog(
             Button(
                 onClick = {
                     if (title.isNotBlank()) {
-                        val trimmedLink = patternUrl.trim()
-                        val formattedLink = if (trimmedLink.isNotBlank() &&
-                            !trimmedLink.startsWith("http://") &&
-                            !trimmedLink.startsWith("https://")) {
-                            "https://$trimmedLink"
-                        } else {
-                            trimmedLink
-                        }
+                        val (isValidUrl, validatedLink) = validateAndFormatUrl(context, patternUrl)
+                        if (!isValidUrl) return@Button
 
                         onConfirm(
                             PatternData(
-                                title = title,
-                                tag = selectedTag,
-                                yarnInfo = yarnInfo,
-                                patternUrl = formattedLink,
-                                imageUrl = imageUri
-                            )
+                                title = title.trim(),
+                                tagCode = PatternData.toServerTag(selectedTag),
+                                yarnInfo = yarnInfo.trim().ifBlank { null },
+                                patternUrl = validatedLink
+                            ),
+                            imageUri
                         )
                     }
                 },
@@ -792,21 +1026,19 @@ fun PatternUploadDialog(
     )
 }
 
-/**
- * 기존 도안 정보 수정 다이얼로그 (1:1 크롭 다이얼로그 연동)
- */
 @Composable
 fun PatternEditDialog(
     pattern: PatternData,
     onDismiss: () -> Unit,
-    onConfirm: (PatternData) -> Unit
+    onConfirm: (PatternData, String?) -> Unit
 ) {
+    val context = LocalContext.current
     var title by remember { mutableStateOf(pattern.title) }
     var selectedTag by remember { mutableStateOf(pattern.tag) }
-    var yarnInfo by remember { mutableStateOf(pattern.yarnInfo) }
-    var patternUrl by remember { mutableStateOf(pattern.patternUrl) }
+    var yarnInfo by remember { mutableStateOf(pattern.yarnInfo ?: "") }
+    var patternUrl by remember { mutableStateOf(pattern.patternUrl ?: "") }
     var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
-    val context = LocalContext.current
+
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
@@ -850,8 +1082,8 @@ fun PatternEditDialog(
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     if (!imageUri.isNullOrEmpty()) {
-                        UriImage(
-                            uriString = imageUri!!,
+                        PatternImage(
+                            imageSource = imageUri!!,
                             contentDescription = "수정된 도안 사진",
                             modifier = Modifier
                                 .fillMaxSize()
@@ -930,14 +1162,8 @@ fun PatternEditDialog(
             Button(
                 onClick = {
                     if (title.isNotBlank()) {
-                        val trimmedLink = patternUrl.trim()
-                        val formattedLink = if (trimmedLink.isNotBlank() &&
-                            !trimmedLink.startsWith("http://") &&
-                            !trimmedLink.startsWith("https://")) {
-                            "https://$trimmedLink"
-                        } else {
-                            trimmedLink
-                        }
+                        val (isValidUrl, validatedLink) = validateAndFormatUrl(context, patternUrl)
+                        if (!isValidUrl) return@Button
 
                         if (imageUri != initialImageUri) {
                             deleteCroppedImageFile(context, initialImageUri)
@@ -945,12 +1171,12 @@ fun PatternEditDialog(
 
                         onConfirm(
                             pattern.copy(
-                                title = title,
-                                tag = selectedTag,
-                                yarnInfo = yarnInfo,
-                                patternUrl = formattedLink,
-                                imageUrl = imageUri
-                            )
+                                title = title.trim(),
+                                tagCode = PatternData.toServerTag(selectedTag),
+                                yarnInfo = yarnInfo.trim().ifBlank { null },
+                                patternUrl = validatedLink
+                            ),
+                            if (imageUri != initialImageUri) imageUri else null
                         )
                     }
                 },
