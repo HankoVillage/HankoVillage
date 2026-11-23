@@ -1,5 +1,5 @@
 import hashlib
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
@@ -8,7 +8,7 @@ from app.dependencies import get_current_user
 from app.errors import ApiError
 from app.models.user import User
 from app.models.yarn import Yarn
-from app.schemas.yarn import YarnCreate, YarnResponse, YarnUpdate
+from app.schemas.yarn import YarnCreate, YarnImageResponse, YarnResponse, YarnUpdate
 from app.utils.storage import (
     delete_private_image,
     get_private_image_bytes,
@@ -34,7 +34,13 @@ def _get_user_yarn_or_404(yarn_id: int, user_id: int, db: Session) -> Yarn:
     return yarn
 
 
-# 1. 실 목록 조회 (GET /yarns?sort=&limit=&offset=)
+def _normalize_optional_text(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    return cleaned if cleaned else None
+
+
 @router.get("", response_model=List[YarnResponse])
 def list_yarns(
     sort: str = Query("NEWEST", description="정렬 기준 (NEWEST: 최신순, NAME: 이름순)"),
@@ -49,7 +55,7 @@ def list_yarns(
     sort_upper = sort.strip().upper()
     if sort_upper in ("NAME", "TITLE"):
         query = query.order_by(Yarn.name.asc(), Yarn.id.desc())
-    elif sort_upper in ("NEWEST", "RECENT"):
+    elif sort_upper in ("NEWEST", "RECENT", "LATEST"):
         query = query.order_by(Yarn.created_at.desc(), Yarn.id.desc())
     else:
         raise ApiError(
@@ -61,7 +67,6 @@ def list_yarns(
     return query.offset(offset).limit(limit).all()
 
 
-# 2. 실 등록 (POST /yarns)
 @router.post("", response_model=YarnResponse, status_code=status.HTTP_201_CREATED)
 def create_yarn(
     req: YarnCreate,
@@ -69,14 +74,21 @@ def create_yarn(
     db: Session = Depends(get_db),
 ):
     """새 실 등록 (라벨 사진은 PUT /yarns/{id}/image로 업로드)"""
+    cleaned_name = req.name.strip()
+    if not cleaned_name:
+        raise ApiError(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            detail="실 이름은 비워둘 수 없어요",
+        )
+
     new_yarn = Yarn(
         user_id=current_user.id,
-        name=req.name,
-        color=req.color,
-        label_image_key=req.label_image_key,
+        name=cleaned_name,
+        color=_normalize_optional_text(req.color),
         purchase_date=req.purchase_date,
-        purchase_site=req.purchase_site,
-        memo=req.memo,
+        purchase_site=_normalize_optional_text(req.purchase_site),
+        memo=_normalize_optional_text(req.memo),
     )
     db.add(new_yarn)
     db.commit()
@@ -84,7 +96,6 @@ def create_yarn(
     return new_yarn
 
 
-# 3. 실 상세 조회 (GET /yarns/{yarn_id})
 @router.get("/{yarn_id}", response_model=YarnResponse)
 def get_yarn_detail(
     yarn_id: int,
@@ -95,7 +106,6 @@ def get_yarn_detail(
     return _get_user_yarn_or_404(yarn_id, current_user.id, db)
 
 
-# 4. 실 정보 수정 (PATCH /yarns/{yarn_id})
 @router.patch("/{yarn_id}", response_model=YarnResponse)
 def update_yarn(
     yarn_id: int,
@@ -103,17 +113,22 @@ def update_yarn(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """실 정보 수정 (선택 항목에 null 전달 시 값 삭제)"""
+    """실 정보 수정"""
     yarn = _get_user_yarn_or_404(yarn_id, current_user.id, db)
     update_data = req.model_dump(exclude_unset=True)
 
-    # name은 NOT NULL 컬럼이므로 명시적 null 차단
-    if "name" in update_data and update_data["name"] is None:
-        raise ApiError(
-            status_code=422,
-            code="VALIDATION_ERROR",
-            detail="실 이름은 비워둘 수 없어요",
-        )
+    if "name" in update_data:
+        if update_data["name"] is None or not update_data["name"].strip():
+            raise ApiError(
+                status_code=422,
+                code="VALIDATION_ERROR",
+                detail="실 이름은 비워둘 수 없어요",
+            )
+        update_data["name"] = update_data["name"].strip()
+
+    for nullable_text_field in ("color", "purchase_site", "memo"):
+        if nullable_text_field in update_data:
+            update_data[nullable_text_field] = _normalize_optional_text(update_data[nullable_text_field])
 
     for field, value in update_data.items():
         setattr(yarn, field, value)
@@ -123,32 +138,30 @@ def update_yarn(
     return yarn
 
 
-# 5. 실 삭제 (DELETE /yarns/{yarn_id})
 @router.delete("/{yarn_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_yarn(
     yarn_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """실 삭제 (연결된 카운터의 yarn_id는 DB ON DELETE SET NULL 자동 처리)"""
+    """실 삭제 및 연결된 라벨 사진 정리"""
     yarn = _get_user_yarn_or_404(yarn_id, current_user.id, db)
 
-    if yarn.label_image_key:
-        delete_private_image(yarn.label_image_key)
-
+    old_key = yarn.label_image_key
     db.delete(yarn)
     db.commit()
+    delete_private_image(old_key)
     return None
 
 
-# 6. 라벨 사진 업로드 (PUT /yarns/{yarn_id}/image)
-@router.put("/{yarn_id}/image", response_model=YarnResponse)
+@router.put("/{yarn_id}/image", response_model=YarnImageResponse)
 async def upload_yarn_image(
     yarn_id: int,
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """실 라벨 사진 등록 및 교체"""
     yarn = _get_user_yarn_or_404(yarn_id, current_user.id, db)
 
     main_jpeg, thumb_jpeg = await process_square_jpeg(file)
@@ -162,24 +175,27 @@ async def upload_yarn_image(
     if old_key and old_key != new_key:
         delete_private_image(old_key)
 
-    return yarn
+    return YarnImageResponse(
+        image_url=f"/yarns/{yarn.id}/image",
+        thumbnail_url=f"/yarns/{yarn.id}/image?thumb=true",
+    )
 
 
-# 7. 라벨 사진 조회 (GET /yarns/{yarn_id}/image?thumb=false)
 @router.get("/{yarn_id}/image")
 def get_yarn_image(
     yarn_id: int,
     request: Request,
-    thumb: bool = Query(False, description="true일 경우 320px 썸네일 반환"),
+    thumb: bool = Query(False, description="true일 경우 썸네일 반환"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """실 라벨 사진 비공개 조회"""
     yarn = _get_user_yarn_or_404(yarn_id, current_user.id, db)
     if not yarn.label_image_key:
         raise ApiError(
             status_code=404,
             code="IMAGE_NOT_FOUND",
-            detail="등록된 라벨 사진이 없어요",
+            detail="이미지를 찾을 수 없어요",
         )
 
     image_bytes, etag = get_private_image_bytes(yarn.label_image_key, thumb=thumb)
@@ -193,18 +209,17 @@ def get_yarn_image(
     return Response(content=image_bytes, media_type="image/jpeg", headers=headers)
 
 
-# 8. 라벨 사진 삭제 (DELETE /yarns/{yarn_id}/image)
 @router.delete("/{yarn_id}/image", status_code=status.HTTP_204_NO_CONTENT)
 def delete_yarn_image(
     yarn_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """실 라벨 사진만 삭제"""
     yarn = _get_user_yarn_or_404(yarn_id, current_user.id, db)
 
     old_key = yarn.label_image_key
     yarn.label_image_key = None
     db.commit()
-
     delete_private_image(old_key)
     return None
