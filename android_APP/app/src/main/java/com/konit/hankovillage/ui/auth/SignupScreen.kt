@@ -348,7 +348,8 @@ fun SignupScreen(
                                 SignupRequest(
                                     signupToken = signupToken,
                                     nickname = nickname,
-                                    termsAgreed = true
+                                    termsAgreed = true,
+                                    ageOver14 = isAgeOver14
                                 )
                             )
                             isLoading = false
