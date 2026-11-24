@@ -660,7 +660,7 @@ fun PatternDetailContent(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "완성작 / 도안 사진 등록하기",
+                        text = "도안 / 완성작 사진 등록하기",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = PointOrange
