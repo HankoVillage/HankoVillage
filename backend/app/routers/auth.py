@@ -69,6 +69,9 @@ class SignupRequest(BaseModel):
     signup_token: str = Field(min_length=1, max_length=2048)
     nickname: str
     terms_agreed: Literal[True]
+    # Under 14 needs a guardian's consent (Personal Information Protection Act, Art. 22-2).
+    # There is no guardian flow, so signup requires confirming 14 or older.
+    age_over_14: Literal[True]
 
     @field_validator("nickname")
     @classmethod
