@@ -6,7 +6,9 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -62,6 +64,52 @@ import org.json.JSONObject
 enum class ProfileSubScreen {
     NONE, EDIT_PROFILE, MY_POSTS, LIKED_POSTS, NOTIFICATION_SETTINGS
 }
+
+/**
+ * 소셜 로그인 제공자("kakao" / "google")에 따른 연동 뱃지 컴포저블
+ */
+@Composable
+private fun SocialProviderBadge(provider: String) {
+    val normalized = provider.trim().lowercase()
+    val (letter, bgColor, textColor, borderColor) = when (normalized) {
+        "kakao" -> Quadruple(
+            "K",
+            Color(0xFFFEE500),
+            Color(0xFF3C1E1E),
+            Color(0xFFE6C800)
+        )
+        "google" -> Quadruple(
+            "G",
+            Color.White,
+            TextDark,
+            Color(0xFFDADCE0)
+        )
+        else -> return
+    }
+
+    Box(
+        modifier = Modifier
+            .size(22.dp)
+            .clip(CircleShape)
+            .background(bgColor)
+            .border(1.dp, borderColor, CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = letter,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = textColor
+        )
+    }
+}
+
+private data class Quadruple<A, B, C, D>(
+    val first: A,
+    val second: B,
+    val third: C,
+    val fourth: D
+)
 
 /**
  * 마이페이지 메인 화면 컴포저블
@@ -228,21 +276,18 @@ fun ProfileScreen(
 
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        Text(
-                            text = profile.nickname,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TextDark
-                        )
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Text(
-                            text = profile.bio,
-                            fontSize = 13.sp,
-                            color = Color.Gray
-                        )
-
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = profile.nickname,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextDark
+                            )
+                            SocialProviderBadge(provider = provider)
+                        }
                         Spacer(modifier = Modifier.height(12.dp))
 
                         val isEditProfileEnabled = false
@@ -258,7 +303,7 @@ fun ProfileScreen(
                                 contentColor = PointOrange,
                                 disabledContentColor = Color.Gray
                             ),
-                            border = androidx.compose.foundation.BorderStroke(
+                            border = BorderStroke(
                                 width = 1.dp,
                                 color = if (isEditProfileEnabled) PointOrange else Color.Gray.copy(alpha = 0.45f)
                             ),
@@ -560,7 +605,7 @@ private fun executeWithdrawal(
                 try {
                     try {
                         credentialManager.clearCredentialState(
-                            androidx.credentials.ClearCredentialStateRequest()
+                            ClearCredentialStateRequest()
                         )
                     } catch (_: Exception) {}
 
@@ -1060,7 +1105,7 @@ fun DeleteAccountDialog(
                     """
                 정말로 탈퇴하시겠습니까?
 
-                작성한 글과 댓글은 삭제되지 않고 '탈퇴한 사용자'로 남습니다.
+                작성한 글과 댓글은 삭제되지 않고 '탈퇴한 회원'으로 남습니다.
                 탈퇴 후에는 작성자 확인이 어려워 글 삭제 요청이 제한될 수 있으니, 지우고 싶은 글은 탈퇴 전에 삭제해 주시기 바랍니다.
                 본인 확인을 위해 가입한 소셜 계정의 로그인 화면이 한 번 더 열립니다
                     """.trimIndent(),

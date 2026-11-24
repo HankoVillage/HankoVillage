@@ -13,9 +13,29 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarDefaults
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -44,36 +64,23 @@ import com.konit.hankovillage.ui.counter.ProjectCounterUpdateRequest
 import com.konit.hankovillage.ui.counter.ProjectData
 import com.konit.hankovillage.ui.counter.ProjectDataSaver
 import com.konit.hankovillage.ui.counter.ProjectListScreen
-import com.konit.hankovillage.ui.pattern.PatternCreateRequest
 import com.konit.hankovillage.ui.pattern.PatternData
 import com.konit.hankovillage.ui.pattern.PatternScreen
-import com.konit.hankovillage.ui.pattern.PatternUpdateRequest
 import com.konit.hankovillage.ui.profile.ProfileScreen
 import com.konit.hankovillage.ui.profile.UserProfileData
 import com.konit.hankovillage.ui.yarn.YarnData
 import com.konit.hankovillage.ui.yarn.YarnScreen
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
-/**
- * 하단 네비게이션 바의 탭 메뉴 항목 데이터 모델입니다.
- *
- * @property title 화면 노출용 탭 이름
- * @property route 네비게이션 라우트 경로
- */
 sealed class BottomNavItem(val title: String, val route: String) {
     object Home : BottomNavItem("단수카운터", "home")
     object Pattern : BottomNavItem("도안 보관", "pattern")
     object Community : BottomNavItem("커뮤니티", "community")
-    object Profile : BottomNavItem("프로필", "profile")
+    object Profile : BottomNavItem("마이 페이지", "profile")
     object Yarn : BottomNavItem("실 보관소", "yarn")
 }
 
-/**
- * 앱의 메인 화면 컴포저블입니다.
- *
- * 하단 네비게이션 바 제어, 로그인 세션 상태 및 회원가입 흐름 관리,
- * 프로젝트·도안 API 연동 및 비회원 로컬 저장소 동기화를 담당합니다.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen() {
@@ -199,7 +206,7 @@ fun MainScreen() {
             } else {
                 Toast.makeText(context, "도안 불러오기 실패 (${patternResponse.code()})", Toast.LENGTH_SHORT).show()
             }
-        } catch (e: kotlinx.coroutines.CancellationException) {
+        } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             Toast.makeText(context, "목록 불러오기 실패: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -246,8 +253,8 @@ fun MainScreen() {
                     NavigationBarItem(
                         selected = currentRoute == item.route,
                         onClick = {
-                            val isLoggedIn = currentUserSession != null
-                            if (!isLoggedIn && (item == BottomNavItem.Pattern || item == BottomNavItem.Yarn)) {
+                            val isGuest = currentUserSession == null
+                            if (isGuest && (item == BottomNavItem.Pattern || item == BottomNavItem.Yarn)) {
                                 showLoginAuthDialog = true
                             } else {
                                 navController.navigate(item.route) {
@@ -297,51 +304,6 @@ fun MainScreen() {
                     patternList = patternList,
                     isLoggedIn = currentUserSession != null
                 )
-            }
-
-            composable(BottomNavItem.Profile.route) {
-                val currentSession = currentUserSession
-                if (currentSession == null) {
-                    if (pendingSignupToken != null) {
-                        SignupScreen(
-                            signupToken = pendingSignupToken!!,
-                            onSignupSuccess = { session ->
-                                pendingSignupToken = null
-                                currentUserSession = session
-                            },
-                            onCancelOrExpired = {
-                                pendingSignupToken = null
-                            }
-                        )
-                    } else {
-                        LoginScreen(
-                            onLoginSuccess = { session ->
-                                currentUserSession = session
-                            },
-                            onGuestMode = {
-                                navController.navigate(BottomNavItem.Home.route)
-                            },
-                            onSignupRequired = { signupToken, provider ->
-                                pendingSignupToken = signupToken
-                                pendingSignupProvider = provider
-                            }
-                        )
-                    }
-                } else {
-                    ProfileScreen(
-                        userProfile = currentSession.profile,
-                        postList = postList,
-                        patternList = patternList,
-                        onUpdateProfile = { updatedProfile ->
-                            currentUserSession = currentUserSession?.copy(profile = updatedProfile)
-                        },
-                        onLogout = {
-                            currentUserSession = null
-                            patternList.clear()
-                            navController.navigate(BottomNavItem.Home.route)
-                        }
-                    )
-                }
             }
 
             composable(BottomNavItem.Home.route) {
@@ -448,7 +410,12 @@ fun MainScreen() {
                             provider = pendingSignupProvider,
                             onSignupSuccess = { session ->
                                 GuestProjectStorage.clearProjects(context)
-                                SessionManager.saveUserInfo(context, session.userId, session.profile.nickname, session.provider)
+                                SessionManager.saveUserInfo(
+                                    context,
+                                    session.userId,
+                                    session.profile.nickname,
+                                    session.provider
+                                )
                                 pendingSignupToken = null
                                 currentUserSession = session
                             },
@@ -460,7 +427,12 @@ fun MainScreen() {
                         LoginScreen(
                             onLoginSuccess = { session ->
                                 GuestProjectStorage.clearProjects(context)
-                                SessionManager.saveUserInfo(context, session.userId, session.profile.nickname, session.provider)
+                                SessionManager.saveUserInfo(
+                                    context,
+                                    session.userId,
+                                    session.profile.nickname,
+                                    session.provider
+                                )
                                 currentUserSession = session
                             },
                             onGuestMode = {
@@ -480,7 +452,12 @@ fun MainScreen() {
                         patternList = patternList,
                         onUpdateProfile = { updatedProfile ->
                             currentUserSession?.let { session ->
-                                SessionManager.saveUserInfo(context, session.userId, updatedProfile.nickname, session.provider)
+                                SessionManager.saveUserInfo(
+                                    context,
+                                    session.userId,
+                                    updatedProfile.nickname,
+                                    session.provider
+                                )
                             }
                             currentUserSession = currentUserSession?.copy(profile = updatedProfile)
                         },
