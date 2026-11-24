@@ -11,10 +11,14 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.dependencies import get_current_user
 from app.errors import ApiError
+from app.models.pattern import Pattern
 from app.models.user import User
+from app.models.yarn import Yarn
 from app.nicknames import normalize_nickname
+from app.routers.photos import delete_photo_files
 from app.sessions import InvalidRefreshToken, end_session, rotate_session, start_session
 from app.social import verify_google_token, verify_kakao_token
+from app.storage import get_private_storage
 from app.tokens import (
     ACCESS_TOKEN_LIFETIME,
     SIGNUP_TOKEN_LIFETIME,
@@ -238,6 +242,11 @@ def withdraw(
         raise reauth_failed("지금 로그인한 계정으로 확인해 주세요")
 
     user_id, provider = user.id, user.provider
+    # Collect photo keys before the DELETE: the CASCADE removes the yarn and pattern rows,
+    # and after that there is no way to find which files belonged to this user.
+    photo_keys = [user.profile_image_key]
+    photo_keys += db.scalars(select(Yarn.label_image_key).where(Yarn.user_id == user_id)).all()
+    photo_keys += db.scalars(select(Pattern.finished_photo_key).where(Pattern.user_id == user_id)).all()
     # One DELETE on users; the database foreign keys do the rest:
     # sessions, device tokens, projects (and memos), patterns, yarns and likes are deleted,
     # posts and comments stay with their author set to NULL.
@@ -245,5 +254,10 @@ def withdraw(
     db.commit()
     # Audit line without personal data (no nickname, no tokens).
     logger.info("Account deleted: user_id=%s provider=%s", user_id, provider)
-    # TODO(photo storage): delete profiles/, yarns/, patterns/ files of this user after commit.
+    # Files go after the commit: if a delete fails the account is still gone and only an orphan
+    # file is left (delete_photo_files logs it). The other order could delete photos of an
+    # account whose DELETE then fails.
+    storage = get_private_storage()
+    for key in photo_keys:
+        delete_photo_files(storage, key)
     return Response(status_code=204)
