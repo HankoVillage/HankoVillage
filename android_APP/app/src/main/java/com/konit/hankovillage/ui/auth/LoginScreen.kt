@@ -3,12 +3,31 @@ package com.konit.hankovillage.ui.auth
 import android.content.Context
 import android.util.Log
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -24,6 +43,8 @@ import androidx.credentials.exceptions.GetCredentialException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.kakao.sdk.auth.model.OAuthToken
+import com.kakao.sdk.common.model.ClientError
+import com.kakao.sdk.common.model.ClientErrorCause
 import com.kakao.sdk.user.UserApiClient
 import com.konit.hankovillage.R
 import com.konit.hankovillage.data.local.GuestProjectStorage
@@ -41,13 +62,6 @@ import com.konit.hankovillage.ui.theme.TextDark
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
-/**
- * 소셜 로그인 및 둘러보기 선택을 제공하는 화면 컴포저블입니다.
- *
- * @param onLoginSuccess 로그인 성공 시 세션 정보를 전달받는 콜백
- * @param onGuestMode 둘러보기 선택 시 실행할 콜백
- * @param onSignupRequired 신규 회원가입 필요 시 signup_token을 전달하는 콜백
- */
 @Composable
 fun LoginScreen(
     onLoginSuccess: (UserSession) -> Unit,
@@ -72,7 +86,6 @@ fun LoginScreen(
                     providerId = userId,
                     profile = UserProfileData(
                         nickname = nickname,
-                        bio = "카카오로 로그인한 뜨개이웃",
                         profileImageUri = profileImage
                     )
                 )
@@ -103,7 +116,6 @@ fun LoginScreen(
                     providerId = userId,
                     profile = UserProfileData(
                         nickname = nickname,
-                        bio = "구글 계정으로 시작한 뜨개이웃",
                         profileImageUri = profileImage
                     )
                 )
@@ -207,7 +219,7 @@ fun LoginScreen(
                     containerColor = GoogleBg,
                     contentColor = TextDark
                 ),
-                border = androidx.compose.foundation.BorderStroke(1.dp, GoogleBorder)
+                border = BorderStroke(1.dp, GoogleBorder)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -270,9 +282,6 @@ fun LoginScreen(
     }
 }
 
-/**
- * 카카오 인증 후 백엔드 API와 통신하여 사용자 세션을 처리하는 핸들러입니다.
- */
 private fun handleKakaoLogin(
     context: Context,
     coroutineScope: CoroutineScope,
@@ -336,12 +345,23 @@ private fun handleKakaoLogin(
         }
     }
 
-    UserApiClient.instance.loginWithKakaoAccount(context, callback = callback)
+    if (UserApiClient.instance.isKakaoTalkLoginAvailable(context)) {
+        UserApiClient.instance.loginWithKakaoTalk(context) { token, error ->
+            if (error != null) {
+                if (error is ClientError && error.reason == ClientErrorCause.Cancelled) {
+                    callback(null, error)
+                } else {
+                    UserApiClient.instance.loginWithKakaoAccount(context, callback = callback)
+                }
+            } else {
+                callback(token, null)
+            }
+        }
+    } else {
+        UserApiClient.instance.loginWithKakaoAccount(context, callback = callback)
+    }
 }
 
-/**
- * 구글 소셜 로그인(Credential Manager) 및 실서버(POST /auth/social/google) 연동 핸들러
- */
 private fun handleGoogleLogin(
     context: Context,
     coroutineScope: CoroutineScope,
