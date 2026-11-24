@@ -47,6 +47,7 @@ import com.konit.hankovillage.ui.util.ImageCropDialog
 import com.konit.hankovillage.ui.util.decodeSampledBitmapFromUri
 import com.konit.hankovillage.ui.util.deleteCroppedImageFile
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -201,8 +202,25 @@ fun PatternScreen(
     }
 
     val trimmedQuery = searchQuery.trim()
-    val filteredPatterns = patternList.filter { pattern ->
-        val matchesQuery = if (trimmedQuery.length >= 2) {
+    var serverResults by remember { mutableStateOf<List<PatternData>?>(null) }
+
+    LaunchedEffect(trimmedQuery, isLoggedIn, patternList.size) {
+        if (!isLoggedIn || trimmedQuery.length < 2) {
+            serverResults = null
+            return@LaunchedEffect
+        }
+        delay(300)
+        serverResults = try {
+            val res = resolvedApiService.getPatterns(search = trimmedQuery, limit = 100)
+            if (res.isSuccessful) res.body() else null
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    val baseList = serverResults ?: patternList
+    val filteredPatterns = baseList.filter { pattern ->
+        val matchesQuery = if (serverResults == null && trimmedQuery.length >= 2) {
             pattern.title.contains(trimmedQuery, ignoreCase = true) ||
                     pattern.tag.equals(trimmedQuery, ignoreCase = true) ||
                     pattern.tagCode.equals(trimmedQuery, ignoreCase = true)
