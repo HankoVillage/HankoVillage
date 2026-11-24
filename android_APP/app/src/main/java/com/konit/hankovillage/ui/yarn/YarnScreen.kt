@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.konit.hankovillage.network.HankoApiService
 import com.konit.hankovillage.network.RetrofitInstance
+import com.konit.hankovillage.network.SessionManager
 import com.konit.hankovillage.ui.counter.ProjectData
 import com.konit.hankovillage.ui.pattern.ImageUploadResponse
 import com.konit.hankovillage.ui.theme.BgColor
@@ -423,6 +424,8 @@ fun YarnScreen(
     }
 }
 
+private const val BASE_IMAGE_HOST = "https://api.hankovillage.com"
+
 @Composable
 private fun YarnImageBox(
     imageSource: Any?,
@@ -445,10 +448,18 @@ private fun YarnImageBox(
                     }
                     is String -> {
                         if (imageSource.isBlank()) null
-                        else if (imageSource.startsWith("http://") || imageSource.startsWith("https://")) {
-                            val prefs = context.getSharedPreferences("hanko_session", Context.MODE_PRIVATE)
-                            val token = prefs.getString("access_token", null)
-                            val conn = (URL(imageSource).openConnection() as HttpURLConnection).apply {
+                        else if (
+                            imageSource.startsWith("http://") ||
+                            imageSource.startsWith("https://") ||
+                            imageSource.startsWith("/")
+                        ) {
+                            val fullUrl = if (imageSource.startsWith("/")) {
+                                "$BASE_IMAGE_HOST$imageSource"
+                            } else {
+                                imageSource
+                            }
+                            val token = SessionManager.getAccessToken(context)
+                            val conn = (URL(fullUrl).openConnection() as HttpURLConnection).apply {
                                 connectTimeout = 5000
                                 readTimeout = 5000
                                 if (!token.isNullOrBlank()) {
@@ -495,7 +506,6 @@ private fun YarnImageBox(
         }
     }
 }
-
 @Composable
 private fun YarnCardItem(
     yarn: YarnData,
