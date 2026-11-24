@@ -242,3 +242,53 @@ docker compose exec -T db sh -c 'dropdb -U "$POSTGRES_USER" restore_test'
 ```
 Allow dynamic-group hanko-app-server to read objects in compartment hankovillage where target.bucket.name='hanko-backup'
 ```
+
+4. **지금 DB가 읽히면** 복구하기 전에 지금 있는 회원 id 목록을 저장한다. 백업 뒤에 탈퇴한 회원을 찾는 데 쓴다(id만 저장, 개인정보 없음).
+
+```bash
+docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At -c "SELECT id FROM users ORDER BY id"' > ~/backups/users-before-restore.txt
+wc -l ~/backups/users-before-restore.txt   # 지금 회원 수와 같은지
+```
+
+5. api를 멈추고 복구한다. 아래 6번 정리가 끝나기 전에는 api를 켜지 않는다(탈퇴한 회원이 다시 로그인하거나, 로그아웃한 토큰이 다시 쓰이는 것을 막기 위해).
+
+```bash
+f=~/backups/daily-<복구할 시각>.dump
+docker compose stop api
+docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner' < "$f"
+```
+
+6. 복구한 DB를 정리한다. 백업은 최대 14일 전 상태라서, 그 사이에 로그아웃한 로그인 토큰과 탈퇴한 회원이 되살아난다. 처리방침의 "탈퇴하면 지체 없이 파기"와 맞추기 위해 둘 다 다시 지운다.
+
+```bash
+# 6-1. 로그인 토큰 전부 삭제 (모든 회원이 한 번 다시 로그인)
+docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "DELETE FROM refresh_tokens"'
+
+# 6-2. 백업 뒤에 탈퇴한 회원 찾기: 4번 목록에 없는 회원. 먼저 개수만 본다
+[ -s ~/backups/users-before-restore.txt ] && ids=$(paste -sd, ~/backups/users-before-restore.txt) && echo "목록 회원 수: $(wc -l < ~/backups/users-before-restore.txt)"
+docker compose exec -T db sh -c "psql -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" -At -c \"SELECT count(*) FROM users WHERE id NOT IN ($ids)\""
+
+# 6-3. 개수를 확인한 뒤 삭제. 탈퇴 API와 같은 방식(users 한 줄 삭제 → 외래 키가 프로젝트·도안·실·토큰을 함께 삭제, 글·댓글은 작성자만 비움)
+docker compose exec -T db sh -c "psql -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" -c \"DELETE FROM users WHERE id NOT IN ($ids)\""
+```
+
+- 6-2에서 `ids`가 비어 있으면 SQL 문법 오류로 멈춘다. 이때 6-3을 실행하지 않는다.
+- 6-2의 개수가 예상보다 많으면(예: 지금 회원보다 많음) 4번 목록이 잘못된 것이니 멈추고 팀과 확인한다.
+- 이 회원들의 사진 파일은 탈퇴할 때 이미 버킷에서 지워졌으므로 따로 지울 것이 없다.
+
+7. api를 켜고 확인한다.
+
+```bash
+docker compose start api
+curl -s https://api.hankovillage.com/health
+```
+
+8. 회원에게 알린다. 약관 제11조 2항("장애 등으로 기록이 손실된 경우 지체 없이 회원에게 알리고 백업을 이용해 복구")에 따른 단계다.
+- 앱 공지와 홈페이지 공지에 올린다.
+- 적을 내용: 장애가 난 날짜, 복구한 백업의 시각(KST), 그 시각 이후의 가입·기록·사진 변경이 사라졌다는 것, 모든 회원이 한 번 다시 로그인해야 한다는 것, 일부 사진은 다시 등록해야 할 수 있다는 것, 문의처(contact@hankovillage.com).
+- 시각은 파일 이름의 UTC에 9시간을 더해 KST로 적는다(예: `daily-20261124T190000Z` → 11/25 04:00 KST).
+
+9. 한계와 후속 조치
+- 지금 DB가 읽히지 않아 4번 목록을 만들 수 없으면, 백업 뒤에 탈퇴한 회원을 찾을 방법이 없다. api 컨테이너 로그의 탈퇴 기록(`Account deleted: user_id=...`)은 컨테이너를 다시 만들면 사라지고, nginx 로그에는 회원 id가 없다. 이 경우 복구 날짜와 사정을 팀에 기록한다(다음 학기 "탈퇴 기록 파일"에서 처리).
+- 백업 뒤에 사진을 바꾸거나 지운 회원은, DB가 이미 지워진 사진 파일을 가리켜 사진이 깨져 보일 수 있다. 8번 공지에 다시 등록하라는 안내를 넣는다(다음 학기 "DB–버킷 정합성 점검", "사진 버전 관리"에서 처리).
+- 복구 뒤 `~/backups/users-before-restore.txt`는 지운다.
