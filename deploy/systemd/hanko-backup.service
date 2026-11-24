@@ -1,0 +1,13 @@
+# Daily DB backup and expired token cleanup. Started by hanko-backup.timer.
+# Install: see deploy/README.md "10. DB 백업".
+[Unit]
+Description=HankoVillage daily DB backup and expired token cleanup
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/hankovillage
+ExecStart=/home/ubuntu/hankovillage/deploy/backup.sh

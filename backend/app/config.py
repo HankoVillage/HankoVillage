@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     oci_region: str = "ap-tokyo-1"
     oci_private_bucket: str = "hanko-private"
 
+    # Daily DB backup (deploy/backup.sh). The server may only create and list objects in this bucket.
+    oci_backup_bucket: str = "hanko-backup"
+    # OCI Notifications topic for backup failure emails. Empty on laptops: alerts are skipped.
+    backup_alert_topic_id: str | None = None
+
     @property
     def database_url(self) -> URL:
         # URL.create escapes special characters (@ : / #) in the password,

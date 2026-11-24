@@ -1,0 +1,11 @@
+# Runs hanko-backup.service every day at 04:00 Korea time.
+# Persistent=true: if the server was off at 04:00, run once right after it starts.
+[Unit]
+Description=Run HankoVillage DB backup daily at 04:00 KST
+
+[Timer]
+OnCalendar=*-*-* 04:00:00 Asia/Seoul
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -193,3 +193,52 @@ docker compose exec api alembic downgrade -1
 ```
 
 3. 데이터가 망가졌으면 6-2에서 만든 백업으로 복원한다. 복원은 팀과 상의한 뒤 진행한다.
+
+## 10. DB 백업 (매일 04:00 KST)
+
+`deploy/backup.sh`가 하는 일: DB 전체를 `~/backups/daily-<UTC시각>.dump`로 저장(주인만 읽기) → 파일 확인 → `hanko-backup` 버킷에 올리고 크기·MD5 확인 → 서버에는 최근 3개만 남김 → 만료 후 30일 지난 재발급 토큰 삭제 → `~/backups/backup.log`에 한 줄씩 기록, 실패하면 OCI 알림 메일.
+
+- 백업 대상은 DB뿐이다. 사진 파일(버킷)은 포함되지 않는다.
+- 서버는 `hanko-backup`에 **올리기·목록만** 할 수 있다(읽기·덮어쓰기·삭제 불가). 14일 지난 백업은 버킷의 수명 주기 규칙이 지운다.
+- 알림 토픽 OCID는 서버 `.env`의 `BACKUP_ALERT_TOPIC_ID`에만 둔다.
+- 새벽 4시 근처에는 배포(api 재빌드)를 하지 않는다. 업로드와 알림이 api 컨테이너에서 실행된다.
+
+### 처음 설치 (서버, sudo 사용 → 팀에 먼저 알린다)
+
+```bash
+sudo cp deploy/systemd/hanko-backup.service deploy/systemd/hanko-backup.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now hanko-backup.timer
+systemctl list-timers hanko-backup.timer
+```
+
+### 확인
+
+```bash
+tail -n 20 ~/backups/backup.log        # 최근 결과
+journalctl -u hanko-backup.service -n 30 --no-pager
+deploy/backup.sh                       # 손으로 한 번 실행 (프로젝트 폴더에서)
+```
+
+### 복구 시험 (운영 DB는 건드리지 않음)
+
+```bash
+f=$(ls -1t ~/backups/daily-*.dump | head -1)
+docker compose exec -T db sh -c 'createdb -U "$POSTGRES_USER" restore_test'
+docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d restore_test --no-owner' < "$f"
+docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d restore_test -P pager=off -c "SELECT (SELECT count(*) FROM users) AS users, (SELECT count(*) FROM projects) AS projects, (SELECT version_num FROM alembic_version) AS version;"'
+docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off -c "SELECT (SELECT count(*) FROM users) AS users, (SELECT count(*) FROM projects) AS projects, (SELECT version_num FROM alembic_version) AS version;"'
+docker compose exec -T db sh -c 'dropdb -U "$POSTGRES_USER" restore_test'
+```
+
+`dropdb`에는 반드시 `restore_test`만 쓴다.
+
+### 실제 복구
+
+1. 팀과 상의하고, 지금 상태도 `before-restore-<날짜>.dump`로 먼저 백업한다(6-2 명령).
+2. 3일 안의 백업이면 `~/backups/daily-*.dump`를 쓴다.
+3. 그보다 오래된 백업이 필요하면, OCI 콘솔 정책에 아래 문장을 **잠깐** 추가해 서버가 내려받을 수 있게 하고, 복구가 끝나면 바로 지운다.
+
+```
+Allow dynamic-group hanko-app-server to read objects in compartment hankovillage where target.bucket.name='hanko-backup'
+```
