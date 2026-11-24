@@ -270,7 +270,10 @@ data class SignupRequest(
     val nickname: String,
 
     @SerializedName("terms_agreed")
-    val termsAgreed: Boolean = true
+    val termsAgreed: Boolean = true,
+
+    @SerializedName("age_over_14")
+    val ageOver14: Boolean
 )
 
 /**

@@ -70,6 +70,7 @@ fun SignupScreen(
 
     var isTermsAgreed by remember { mutableStateOf(false) }
     var isPrivacyAgreed by remember { mutableStateOf(false) }
+    var isAgeOver14 by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
 
     var termsDialogTitle by remember { mutableStateOf<String?>(null) }
@@ -81,8 +82,9 @@ fun SignupScreen(
         uri?.let { pendingCropUri = it }
     }
 
+    val isAllAgreed = isTermsAgreed && isPrivacyAgreed && isAgeOver14
     val nicknameRegex = remember { Regex("^[가-힣a-zA-Z0-9]{2,10}$") }
-    val canSubmit = nicknameRegex.matches(nickname) && isTermsAgreed && isPrivacyAgreed && !isLoading
+    val canSubmit = nicknameRegex.matches(nickname) && isAllAgreed && !isLoading
 
     Scaffold(
         containerColor = BgColor,
@@ -243,16 +245,18 @@ fun SignupScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                val next = !(isTermsAgreed && isPrivacyAgreed)
+                                val next = !isAllAgreed
                                 isTermsAgreed = next
                                 isPrivacyAgreed = next
+                                isAgeOver14 = next
                             }
                     ) {
                         Checkbox(
-                            checked = isTermsAgreed && isPrivacyAgreed,
-                            onCheckedChange = {
-                                isTermsAgreed = it
-                                isPrivacyAgreed = it
+                            checked = isAllAgreed,
+                            onCheckedChange = { next ->
+                                isTermsAgreed = next
+                                isPrivacyAgreed = next
+                                isAgeOver14 = next
                             },
                             colors = CheckboxDefaults.colors(checkedColor = PointOrange)
                         )
@@ -316,6 +320,20 @@ fun SignupScreen(
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                         )
                     }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { isAgeOver14 = !isAgeOver14 }
+                    ) {
+                        Checkbox(
+                            checked = isAgeOver14,
+                            onCheckedChange = { isAgeOver14 = it },
+                            colors = CheckboxDefaults.colors(checkedColor = PointOrange)
+                        )
+                        Text("[필수] 만 14세 이상입니다", fontSize = 13.sp, color = TextDark)
+                    }
                 }
             }
 
@@ -330,7 +348,8 @@ fun SignupScreen(
                                 SignupRequest(
                                     signupToken = signupToken,
                                     nickname = nickname,
-                                    termsAgreed = true
+                                    termsAgreed = true,
+                                    ageOver14 = isAgeOver14
                                 )
                             )
                             isLoading = false
