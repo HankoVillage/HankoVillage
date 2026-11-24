@@ -77,7 +77,7 @@ sealed class BottomNavItem(val title: String, val route: String) {
     object Home : BottomNavItem("단수카운터", "home")
     object Pattern : BottomNavItem("도안 보관", "pattern")
     object Community : BottomNavItem("커뮤니티", "community")
-    object Profile : BottomNavItem("프로필", "profile")
+    object Profile : BottomNavItem("마이 페이지", "profile")
     object Yarn : BottomNavItem("실 보관소", "yarn")
 }
 
