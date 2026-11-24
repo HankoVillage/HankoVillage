@@ -36,7 +36,7 @@ def validate_link_url(url: Optional[str]) -> Optional[str]:
         return None
     cleaned = url.strip()
     if not (cleaned.startswith("http://") or cleaned.startswith("https://")):
-        raise ApiError(422, "INVALID_URL", "도안 링크는 http:// 또는 https://로 시작해야 해요")
+        raise ApiError(422, "VALIDATION_ERROR", "입력값을 확인해 주세요")
     return cleaned
 
 
@@ -54,7 +54,7 @@ def list_patterns(
     """내 도안 목록 조회 및 검색 (pg_trgm + 관련도 순 정렬)"""
     sort_upper = sort.upper()
     if sort_upper not in ("NEWEST", "LATEST", "TITLE"):
-        raise ApiError(422, "VALIDATION_ERROR", "sort 값은 NEWEST 또는 TITLE이어야 해요")
+        raise ApiError(422, "VALIDATION_ERROR", "입력값을 확인해 주세요")
 
     query = db.query(Pattern).filter(Pattern.user_id == current_user.id)
 
@@ -67,7 +67,7 @@ def list_patterns(
     if search is not None:
         kw = search.strip()
         if len(kw) < 2:
-            raise ApiError(422, "VALIDATION_ERROR", "검색어는 2글자 이상 입력해 주세요")
+            raise ApiError(422, "VALIDATION_ERROR", "입력값을 확인해 주세요")
 
         if len(kw) >= 3:
             title_cond = Pattern.title.ilike(f"%{kw}%")
@@ -147,7 +147,7 @@ def get_pattern_detail(
         .first()
     )
     if not pattern:
-        raise ApiError(404, "PATTERN_NOT_FOUND", "도안을 찾을 수 없어요")
+        raise ApiError(404, "PATTERN_NOT_FOUND", "요청하신 도안을 찾을 수 없어요")
     return pattern
 
 
@@ -165,13 +165,13 @@ def update_pattern(
         .first()
     )
     if not pattern:
-        raise ApiError(404, "PATTERN_NOT_FOUND", "도안을 찾을 수 없어요")
+        raise ApiError(404, "PATTERN_NOT_FOUND", "요청하신 도안을 찾을 수 없어요")
 
     update_data = req.model_dump(exclude_unset=True)
 
     for non_nullable in ("title", "tag", "status"):
         if non_nullable in update_data and update_data[non_nullable] is None:
-            raise ApiError(422, "VALIDATION_ERROR", f"{non_nullable} 값은 비워둘 수 없어요")
+            raise ApiError(422, "VALIDATION_ERROR", "입력값을 확인해 주세요")
 
     if "link_url" in update_data:
         update_data["link_url"] = validate_link_url(update_data["link_url"])
@@ -198,7 +198,7 @@ def delete_pattern(
         .first()
     )
     if not pattern:
-        raise ApiError(404, "PATTERN_NOT_FOUND", "도안을 찾을 수 없어요")
+        raise ApiError(404, "PATTERN_NOT_FOUND", "요청하신 도안을 찾을 수 없어요")
 
     old_key = pattern.finished_photo_key
     db.delete(pattern)

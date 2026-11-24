@@ -49,7 +49,7 @@ def list_yarns(
     elif sort_upper in ("NEWEST", "RECENT", "LATEST"):
         query = query.order_by(Yarn.created_at.desc(), Yarn.id.desc())
     else:
-        raise ApiError(422, "VALIDATION_ERROR", "지원하지 않는 정렬 기준이에요")
+        raise ApiError(422, "VALIDATION_ERROR", "입력값을 확인해 주세요")
 
     return query.offset(offset).limit(limit).all()
 
@@ -62,7 +62,7 @@ def create_yarn(
 ):
     cleaned_name = req.name.strip()
     if not cleaned_name:
-        raise ApiError(422, "VALIDATION_ERROR", "실 이름은 비워둘 수 없어요")
+        raise ApiError(422, "VALIDATION_ERROR", "입력값을 확인해 주세요")
 
     new_yarn = Yarn(
         user_id=current_user.id,
@@ -99,7 +99,7 @@ def update_yarn(
 
     if "name" in update_data:
         if update_data["name"] is None or not update_data["name"].strip():
-            raise ApiError(422, "VALIDATION_ERROR", "실 이름은 비워둘 수 없어요")
+            raise ApiError(422, "VALIDATION_ERROR", "입력값을 확인해 주세요")
         update_data["name"] = update_data["name"].strip()
 
     for field in ("color", "purchase_site", "memo"):
